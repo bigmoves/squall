@@ -1,6 +1,8 @@
 name = "squall"
 version = "0.1.0"
 description = "Type-safe GraphQL client generator for Gleam"
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "bigmoves", repo = "squall" }
 
 [dependencies]
 gleam_stdlib = ">= 0.34.0 and < 0.40.0"
