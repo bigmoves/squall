@@ -1,1 +1,0 @@
--record(named_type_ref, {name :: binary()}).

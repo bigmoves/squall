@@ -1,1 +1,0 @@
--record(nest, {doc :: glam@doc:document(), indentation :: integer()}).

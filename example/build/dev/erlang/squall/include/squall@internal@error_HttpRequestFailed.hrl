@@ -1,1 +1,0 @@
--record(http_request_failed, {reason :: binary()}).

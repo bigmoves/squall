@@ -1,1 +1,0 @@
--record(option_type, {inner :: squall@internal@type_mapping:gleam_type()}).

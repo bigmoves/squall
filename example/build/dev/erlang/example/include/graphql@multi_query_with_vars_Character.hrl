@@ -1,1 +1,0 @@
--record(character, {name :: gleam@option:option(binary())}).

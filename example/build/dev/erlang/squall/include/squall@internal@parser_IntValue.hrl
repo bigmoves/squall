@@ -1,1 +1,0 @@
--record(int_value, {value :: integer()}).

@@ -1,1 +1,0 @@
--record(force_break, {doc :: glam@doc:document()}).

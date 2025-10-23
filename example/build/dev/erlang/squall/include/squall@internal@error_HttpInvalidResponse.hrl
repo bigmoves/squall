@@ -1,1 +1,0 @@
--record(http_invalid_response, {status :: integer(), body :: binary()}).

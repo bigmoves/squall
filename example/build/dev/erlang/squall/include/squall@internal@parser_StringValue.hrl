@@ -1,1 +1,0 @@
--record(string_value, {value :: binary()}).

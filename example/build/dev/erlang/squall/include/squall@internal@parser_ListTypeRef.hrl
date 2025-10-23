@@ -1,1 +1,0 @@
--record(list_type_ref, {inner :: squall@internal@parser:type_ref()}).

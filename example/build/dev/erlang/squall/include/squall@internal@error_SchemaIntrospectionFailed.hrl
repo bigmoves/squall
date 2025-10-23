@@ -1,1 +1,0 @@
--record(schema_introspection_failed, {reason :: binary()}).

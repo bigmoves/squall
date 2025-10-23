@@ -1,1 +1,0 @@
--record(text, {text :: binary(), length :: integer()}).

@@ -1,1 +1,0 @@
--record(group, {doc :: glam@doc:document()}).

@@ -1,1 +1,0 @@
--record(location, {id :: gleam@option:option(binary())}).
