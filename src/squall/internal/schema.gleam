@@ -1,5 +1,6 @@
 import gleam/dict.{type Dict}
-import gleam/dynamic.{type Dynamic, type DecodeError}
+import gleam/dynamic.{type Dynamic}
+import gleam/dynamic/decode
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
@@ -72,10 +73,44 @@ pub type Schema {
   )
 }
 
+// Helper functions for decoding with new API
+fn field(
+  dyn: Dynamic,
+  name: String,
+  decoder: decode.Decoder(t),
+) -> Result(t, List(decode.DecodeError)) {
+  let field_decoder = {
+    use value <- decode.field(name, decoder)
+    decode.success(value)
+  }
+  decode.run(dyn, field_decoder)
+}
+
+fn optional_field(
+  dyn: Dynamic,
+  name: String,
+  decoder: decode.Decoder(t),
+) -> Option(t) {
+  field(dyn, name, decoder)
+  |> result.map(Some)
+  |> result.unwrap(None)
+}
+
+fn decode_errors_to_string(errs: List(decode.DecodeError)) -> String {
+  errs
+  |> list.map(fn(_err) { "Decode error" })
+  |> list.reduce(fn(a, b) { a <> ", " <> b })
+  |> result.unwrap("unknown error")
+}
+
 // Parse introspection response JSON into Schema
 pub fn parse_introspection_response(json_str: String) -> Result(Schema, Error) {
-  case json.decode(from: json_str, using: dynamic.dynamic) {
+  case json.parse(from: json_str, using: decode.dynamic) {
     Ok(dyn) -> decode_schema(dyn)
+    Error(json.UnableToDecode(errs)) ->
+      Error(error.InvalidSchemaResponse(
+        "Decode error: " <> decode_errors_to_string(errs),
+      ))
     Error(_) -> Error(error.InvalidSchemaResponse("Invalid JSON"))
   }
 }
@@ -83,42 +118,35 @@ pub fn parse_introspection_response(json_str: String) -> Result(Schema, Error) {
 fn decode_schema(dyn: Dynamic) -> Result(Schema, Error) {
   // Extract data.__schema
   use data <- result.try(
-    dynamic.field("data", dynamic.dynamic)(dyn)
+    field(dyn, "data", decode.dynamic)
     |> result.map_error(to_schema_error),
   )
   use schema_obj <- result.try(
-    dynamic.field("__schema", dynamic.dynamic)(data)
+    field(data, "__schema", decode.dynamic)
     |> result.map_error(to_schema_error),
   )
 
   // Parse optional query type
-  let query_type =
-    dynamic.field("queryType", dynamic.dynamic)(schema_obj)
-    |> result.then(dynamic.field("name", dynamic.string))
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let query_type = case field(schema_obj, "queryType", decode.dynamic) {
+    Ok(qt) -> optional_field(qt, "name", decode.string)
+    Error(_) -> None
+  }
 
   // Parse optional mutation type
-  let mutation_type =
-    dynamic.field("mutationType", dynamic.dynamic)(schema_obj)
-    |> result.then(dynamic.field("name", dynamic.string))
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let mutation_type = case field(schema_obj, "mutationType", decode.dynamic) {
+    Ok(mt) -> optional_field(mt, "name", decode.string)
+    Error(_) -> None
+  }
 
   // Parse optional subscription type
-  let subscription_type =
-    dynamic.field("subscriptionType", dynamic.dynamic)(schema_obj)
-    |> result.then(dynamic.field("name", dynamic.string))
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let subscription_type = case field(schema_obj, "subscriptionType", decode.dynamic) {
+    Ok(st) -> optional_field(st, "name", decode.string)
+    Error(_) -> None
+  }
 
   // Parse types array
-  use types_dynamic <- result.try(
-    dynamic.field("types", dynamic.dynamic)(schema_obj)
-    |> result.map_error(to_schema_error),
-  )
   use types_list_dyn <- result.try(
-    dynamic.list(dynamic.dynamic)(types_dynamic)
+    field(schema_obj, "types", decode.list(of: decode.dynamic))
     |> result.map_error(to_schema_error),
   )
 
@@ -140,24 +168,21 @@ fn decode_schema(dyn: Dynamic) -> Result(Schema, Error) {
 
 fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
   use name <- result.try(
-    dynamic.field("name", dynamic.string)(dyn)
+    field(dyn, "name", decode.string)
     |> result.map_error(to_schema_error),
   )
   use kind <- result.try(
-    dynamic.field("kind", dynamic.string)(dyn)
+    field(dyn, "kind", decode.string)
     |> result.map_error(to_schema_error),
   )
 
-  let description =
-    dynamic.field("description", dynamic.string)(dyn)
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let description = optional_field(dyn, "description", decode.string)
 
   case kind {
     "SCALAR" -> Ok(ScalarType(name, description))
 
     "OBJECT" | "INTERFACE" -> {
-      let fields = case dynamic.field("fields", dynamic.list(dynamic.dynamic))(dyn) {
+      let fields = case field(dyn, "fields", decode.list(of: decode.dynamic)) {
         Ok(fields_dyn) -> {
           list.try_map(fields_dyn, decode_field)
           |> result.unwrap([])
@@ -172,10 +197,10 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "UNION" -> {
-      let possible_types = case dynamic.field("possibleTypes", dynamic.list(dynamic.dynamic))(dyn) {
+      let possible_types = case field(dyn, "possibleTypes", decode.list(of: decode.dynamic)) {
         Ok(types_dyn) -> {
           list.try_map(types_dyn, fn(d) {
-            dynamic.field("name", dynamic.string)(d)
+            field(d, "name", decode.string)
             |> result.map_error(to_schema_error)
           })
           |> result.unwrap([])
@@ -187,10 +212,10 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "ENUM" -> {
-      let enum_values = case dynamic.field("enumValues", dynamic.list(dynamic.dynamic))(dyn) {
+      let enum_values = case field(dyn, "enumValues", decode.list(of: decode.dynamic)) {
         Ok(values_dyn) -> {
           list.try_map(values_dyn, fn(d) {
-            dynamic.field("name", dynamic.string)(d)
+            field(d, "name", decode.string)
             |> result.map_error(to_schema_error)
           })
           |> result.unwrap([])
@@ -202,7 +227,7 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "INPUT_OBJECT" -> {
-      let input_fields = case dynamic.field("inputFields", dynamic.list(dynamic.dynamic))(dyn) {
+      let input_fields = case field(dyn, "inputFields", decode.list(of: decode.dynamic)) {
         Ok(fields_dyn) -> {
           list.try_map(fields_dyn, decode_input_value)
           |> result.unwrap([])
@@ -219,16 +244,16 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
 
 fn decode_field(dyn: Dynamic) -> Result(Field, Error) {
   use name <- result.try(
-    dynamic.field("name", dynamic.string)(dyn)
+    field(dyn, "name", decode.string)
     |> result.map_error(to_schema_error),
   )
   use type_dyn <- result.try(
-    dynamic.field("type", dynamic.dynamic)(dyn)
+    field(dyn, "type", decode.dynamic)
     |> result.map_error(to_schema_error),
   )
   use type_ref <- result.try(decode_type_ref(type_dyn))
 
-  let args = case dynamic.field("args", dynamic.list(dynamic.dynamic))(dyn) {
+  let args = case field(dyn, "args", decode.list(of: decode.dynamic)) {
     Ok(args_dyn) -> {
       list.try_map(args_dyn, decode_input_value)
       |> result.unwrap([])
@@ -236,43 +261,37 @@ fn decode_field(dyn: Dynamic) -> Result(Field, Error) {
     Error(_) -> []
   }
 
-  let description =
-    dynamic.field("description", dynamic.string)(dyn)
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let description = optional_field(dyn, "description", decode.string)
 
   Ok(Field(name, type_ref, args, description))
 }
 
 fn decode_input_value(dyn: Dynamic) -> Result(InputValue, Error) {
   use name <- result.try(
-    dynamic.field("name", dynamic.string)(dyn)
+    field(dyn, "name", decode.string)
     |> result.map_error(to_schema_error),
   )
   use type_dyn <- result.try(
-    dynamic.field("type", dynamic.dynamic)(dyn)
+    field(dyn, "type", decode.dynamic)
     |> result.map_error(to_schema_error),
   )
   use type_ref <- result.try(decode_type_ref(type_dyn))
 
-  let description =
-    dynamic.field("description", dynamic.string)(dyn)
-    |> result.map(Some)
-    |> result.unwrap(None)
+  let description = optional_field(dyn, "description", decode.string)
 
   Ok(InputValue(name, type_ref, description))
 }
 
 fn decode_type_ref(dyn: Dynamic) -> Result(TypeRef, Error) {
   use kind <- result.try(
-    dynamic.field("kind", dynamic.string)(dyn)
+    field(dyn, "kind", decode.string)
     |> result.map_error(to_schema_error),
   )
 
   case kind {
     "NON_NULL" -> {
       use of_type_dyn <- result.try(
-        dynamic.field("ofType", dynamic.dynamic)(dyn)
+        field(dyn, "ofType", decode.dynamic)
         |> result.map_error(to_schema_error),
       )
       use of_type <- result.try(decode_type_ref(of_type_dyn))
@@ -281,7 +300,7 @@ fn decode_type_ref(dyn: Dynamic) -> Result(TypeRef, Error) {
 
     "LIST" -> {
       use of_type_dyn <- result.try(
-        dynamic.field("ofType", dynamic.dynamic)(dyn)
+        field(dyn, "ofType", decode.dynamic)
         |> result.map_error(to_schema_error),
       )
       use of_type <- result.try(decode_type_ref(of_type_dyn))
@@ -290,7 +309,7 @@ fn decode_type_ref(dyn: Dynamic) -> Result(TypeRef, Error) {
 
     _ -> {
       use name <- result.try(
-        dynamic.field("name", dynamic.string)(dyn)
+        field(dyn, "name", decode.string)
         |> result.map_error(to_schema_error),
       )
       Ok(NamedType(name, kind_from_string(kind)))
@@ -312,15 +331,8 @@ fn kind_from_string(s: String) -> TypeKind {
   }
 }
 
-fn to_schema_error(errs: List(DecodeError)) -> Error {
-  error.InvalidSchemaResponse("Decode error: " <> errors_to_string(errs))
-}
-
-fn errors_to_string(errs: List(DecodeError)) -> String {
-  errs
-  |> list.map(fn(err) { "Expected " <> err.expected })
-  |> list.reduce(fn(a, b) { a <> ", " <> b })
-  |> result.unwrap("unknown error")
+fn to_schema_error(errs: List(decode.DecodeError)) -> Error {
+  error.InvalidSchemaResponse("Decode error: " <> decode_errors_to_string(errs))
 }
 
 // Helper functions for tests

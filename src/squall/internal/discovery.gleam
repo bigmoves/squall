@@ -50,7 +50,7 @@ pub fn extract_operation_name(path: String) -> Result(String, Error) {
 
   // Remove .gql extension
   let name = case string.ends_with(filename, ".gql") {
-    True -> string.drop_right(filename, 4)
+    True -> string.drop_end(filename, 4)
     False -> filename
   }
 

@@ -1,8 +1,8 @@
 ---
-version: 1.2.0
+version: 1.4.1
 title: Query with inline scalar arguments
 ---
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
 import gleam/httpc
@@ -16,29 +16,19 @@ pub type Character {
   Character(id: String, name: String)
 }
 
-pub fn character_decoder() -> dynamic.Decoder(Character) {
-  fn(data: dynamic.Dynamic) -> Result(Character, List(dynamic.DecodeError)) {
-    use id <- result.try(dynamic.field("id", dynamic.string)(data))
-    use name <- result.try(dynamic.field("name", dynamic.string)(data))
-    Ok(Character(id: id, name: name))
-  }
+pub fn character_decoder() -> decode.Decoder(Character) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  decode.success(Character(id: id, name: name))
 }
 
 pub type GetCharacterResponse {
   GetCharacterResponse(character: Option(Character))
 }
 
-pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse) {
-  fn(data: dynamic.Dynamic) -> Result(
-    GetCharacterResponse,
-    List(dynamic.DecodeError),
-  ) {
-    use character <- result.try(dynamic.field(
-      "character",
-      dynamic.optional(character_decoder()),
-    )(data))
-    Ok(GetCharacterResponse(character: character))
-  }
+pub fn get_character_response_decoder() -> decode.Decoder(GetCharacterResponse) {
+  use character <- decode.field("character", decode.optional(character_decoder()))
+  decode.success(GetCharacterResponse(character: character))
 }
 
 pub fn get_character(client: squall.Client) -> Result(GetCharacterResponse, String) {
@@ -66,13 +56,14 @@ pub fn get_character(client: squall.Client) -> Result(GetCharacterResponse, Stri
     |> result.map_error(fn(_) { "HTTP request failed" }),
   )
   use json_value <- result.try(
-    json.decode(from: resp.body, using: dynamic.dynamic)
+    json.parse(from: resp.body, using: decode.dynamic)
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
-  use data_field <- result.try(
-    dynamic.field("data", dynamic.dynamic)(json_value)
-    |> result.map_error(fn(_) { "No data field in response" }),
-  )
-  get_character_response_decoder()(data_field)
+  let data_and_response_decoder = {
+    use data <- decode.field("data", get_character_response_decoder())
+    decode.success(data)
+  }
+  decode.run(json_value, data_and_response_decoder)
   |> result.map_error(fn(_) { "Failed to decode response data" })
 }
+
