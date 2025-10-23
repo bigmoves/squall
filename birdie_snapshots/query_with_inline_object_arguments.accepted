@@ -1,6 +1,8 @@
 ---
 version: 1.2.0
 title: Query with inline object arguments
+file: ./test/codegen_test.gleam
+test_name: generate_inline_object_arguments_test
 ---
 import gleam/dynamic
 import gleam/http
@@ -15,7 +17,10 @@ pub type CharactersResult {
 }
 
 pub fn characters_result_decoder() -> dynamic.Decoder(CharactersResult) {
-  fn(data: dynamic.Dynamic) -> Result(CharactersResult, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    CharactersResult,
+    List(dynamic.DecodeError),
+  ) {
     use results <- result.try(dynamic.field(
       "results",
       dynamic.optional(dynamic.list(character_decoder())),
@@ -41,7 +46,10 @@ pub type GetCharactersResponse {
 }
 
 pub fn get_characters_response_decoder() -> dynamic.Decoder(GetCharactersResponse) {
-  fn(data: dynamic.Dynamic) -> Result(GetCharactersResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    GetCharactersResponse,
+    List(dynamic.DecodeError),
+  ) {
     use characters <- result.try(dynamic.field(
       "characters",
       dynamic.optional(characters_result_decoder()),
@@ -52,18 +60,20 @@ pub fn get_characters_response_decoder() -> dynamic.Decoder(GetCharactersRespons
 
 pub fn get_characters(endpoint: String) -> Result(GetCharactersResponse, String) {
   let query =
-  "query GetCharacters { characters(filter: { name: \"rick\", status: \"alive\" }) { results { id name } } }"
-  let variables = json.object([])
+    "query GetCharacters { characters(filter: { name: \"rick\", status: \"alive\" }) { results { id name } } }"
+  let variables =
+    json.object([])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

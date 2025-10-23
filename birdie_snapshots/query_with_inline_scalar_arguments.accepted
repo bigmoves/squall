@@ -1,6 +1,8 @@
 ---
 version: 1.2.0
 title: Query with inline scalar arguments
+file: ./test/codegen_test.gleam
+test_name: generate_inline_scalar_arguments_test
 ---
 import gleam/dynamic
 import gleam/http
@@ -27,7 +29,10 @@ pub type GetCharacterResponse {
 }
 
 pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse) {
-  fn(data: dynamic.Dynamic) -> Result(GetCharacterResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    GetCharacterResponse,
+    List(dynamic.DecodeError),
+  ) {
     use character <- result.try(dynamic.field(
       "character",
       dynamic.optional(character_decoder()),
@@ -37,18 +42,21 @@ pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse)
 }
 
 pub fn get_character(endpoint: String) -> Result(GetCharacterResponse, String) {
-  let query = "query GetCharacter { character(id: 1) { id name } }"
-  let variables = json.object([])
+  let query =
+    "query GetCharacter { character(id: 1) { id name } }"
+  let variables =
+    json.object([])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

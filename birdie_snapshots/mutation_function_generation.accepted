@@ -29,7 +29,10 @@ pub type CreateUserResponse {
 }
 
 pub fn create_user_response_decoder() -> dynamic.Decoder(CreateUserResponse) {
-  fn(data: dynamic.Dynamic) -> Result(CreateUserResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    CreateUserResponse,
+    List(dynamic.DecodeError),
+  ) {
     use create_user <- result.try(dynamic.field(
       "createUser",
       dynamic.optional(user_decoder()),
@@ -38,23 +41,22 @@ pub fn create_user_response_decoder() -> dynamic.Decoder(CreateUserResponse) {
   }
 }
 
-pub fn create_user(endpoint: String, name: String) -> Result(
-  CreateUserResponse,
-  String,
-) {
+pub fn create_user(endpoint: String, name: String) -> Result(CreateUserResponse, String) {
   let query =
-  "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }"
-  let variables = json.object([#("name", json.string(name))])
+    "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }"
+  let variables =
+    json.object([#("name", json.string(name))])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

@@ -83,7 +83,10 @@ pub type MultiQueryResponse {
 }
 
 pub fn multi_query_response_decoder() -> dynamic.Decoder(MultiQueryResponse) {
-  fn(data: dynamic.Dynamic) -> Result(MultiQueryResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    MultiQueryResponse,
+    List(dynamic.DecodeError),
+  ) {
     use characters <- result.try(dynamic.field(
       "characters",
       dynamic.optional(characters_decoder()),
@@ -96,30 +99,30 @@ pub fn multi_query_response_decoder() -> dynamic.Decoder(MultiQueryResponse) {
       "episodesByIds",
       dynamic.optional(dynamic.list(episode_decoder())),
     )(data))
-    Ok(
-      MultiQueryResponse(
-        characters: characters,
-        location: location,
-        episodes_by_ids: episodes_by_ids,
-      ),
-    )
+    Ok(MultiQueryResponse(
+      characters: characters,
+      location: location,
+      episodes_by_ids: episodes_by_ids,
+    ))
   }
 }
 
 pub fn multi_query(endpoint: String) -> Result(MultiQueryResponse, String) {
   let query =
-  "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }"
-  let variables = json.object([])
+    "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }"
+  let variables =
+    json.object([])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

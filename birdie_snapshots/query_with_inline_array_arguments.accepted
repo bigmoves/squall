@@ -29,7 +29,10 @@ pub type GetEpisodesResponse {
 }
 
 pub fn get_episodes_response_decoder() -> dynamic.Decoder(GetEpisodesResponse) {
-  fn(data: dynamic.Dynamic) -> Result(GetEpisodesResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    GetEpisodesResponse,
+    List(dynamic.DecodeError),
+  ) {
     use episodes_by_ids <- result.try(dynamic.field(
       "episodesByIds",
       dynamic.optional(dynamic.list(episode_decoder())),
@@ -39,18 +42,21 @@ pub fn get_episodes_response_decoder() -> dynamic.Decoder(GetEpisodesResponse) {
 }
 
 pub fn get_episodes(endpoint: String) -> Result(GetEpisodesResponse, String) {
-  let query = "query GetEpisodes { episodesByIds(ids: [1, 2, 3]) { id name } }"
-  let variables = json.object([])
+  let query =
+    "query GetEpisodes { episodesByIds(ids: [1, 2, 3]) { id name } }"
+  let variables =
+    json.object([])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

@@ -83,9 +83,10 @@ fn block(body: List(Document)) -> Document {
 
 /// A pretty printed let assignment.
 fn let_var(name: String, body: Document) -> Document {
-  [doc.from_string("let " <> name <> " ="), doc.space, body]
-  |> doc.concat
-  |> doc.group
+  doc.group(doc.concat([
+    doc.from_string("let " <> name <> " ="),
+    doc.nest(doc.concat([doc.line, body]), by: indent),
+  ]))
 }
 
 /// A pretty printed Gleam string with proper escaping.
@@ -400,14 +401,25 @@ fn generate_decoder_with_schema(
       doc.from_string(sanitized <> ": " <> sanitized)
     })
 
-  let success_line = call_doc("Ok", [call_doc(type_name, constructor_args)])
+  // Don't use call_doc for Ok(...) to prevent breaking between Ok( and Constructor
+  let success_line =
+    doc.concat([
+      doc.from_string("Ok("),
+      call_doc(type_name, constructor_args),
+      doc.from_string(")"),
+    ])
 
   let inner_fn_body = list.append(field_decoder_docs, [success_line])
 
+  // Use call_doc for the return type to allow it to break when needed
   let inner_fn =
     doc.concat([
-      doc.from_string("fn(data: dynamic.Dynamic) -> Result("),
-      doc.from_string(type_name <> ", List(dynamic.DecodeError)) "),
+      doc.from_string("fn(data: dynamic.Dynamic) -> "),
+      call_doc("Result", [
+        doc.from_string(type_name),
+        doc.from_string("List(dynamic.DecodeError)"),
+      ]),
+      doc.from_string(" "),
       block(inner_fn_body),
     ])
 
@@ -646,11 +658,10 @@ fn generate_function(
   ]
 
   // Build function signature
-  let return_type =
-    call_doc("Result", [
-      doc.from_string(response_type_name),
-      doc.from_string("String"),
-    ])
+  // Don't use call_doc for return type to prevent it from breaking before parameters
+  let return_type = doc.from_string(
+    "Result(" <> response_type_name <> ", String)",
+  )
 
   doc.concat([
     doc.from_string("pub fn " <> function_name),

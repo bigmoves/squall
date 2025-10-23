@@ -1,6 +1,8 @@
 ---
 version: 1.2.0
 title: Simple query function generation
+file: ./test/codegen_test.gleam
+test_name: generate_simple_query_test
 ---
 import gleam/dynamic
 import gleam/http
@@ -30,7 +32,10 @@ pub type GetUserResponse {
 }
 
 pub fn get_user_response_decoder() -> dynamic.Decoder(GetUserResponse) {
-  fn(data: dynamic.Dynamic) -> Result(GetUserResponse, List(dynamic.DecodeError)) {
+  fn(data: dynamic.Dynamic) -> Result(
+    GetUserResponse,
+    List(dynamic.DecodeError),
+  ) {
     use user <- result.try(dynamic.field(
       "user",
       dynamic.optional(user_decoder()),
@@ -40,18 +45,21 @@ pub fn get_user_response_decoder() -> dynamic.Decoder(GetUserResponse) {
 }
 
 pub fn get_user(endpoint: String) -> Result(GetUserResponse, String) {
-  let query = "query GetUser { user { id name } }"
-  let variables = json.object([])
+  let query =
+    "query GetUser { user { id name } }"
+  let variables =
+    json.object([])
   let body =
-  json.object([#("query", json.string(query)), #("variables", variables)])
+    json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req = req
-  |> request.set_method(http.Post)
-  |> request.set_body(json.to_string(body))
-  |> request.set_header("content-type", "application/json")
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),
