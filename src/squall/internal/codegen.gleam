@@ -28,6 +28,15 @@ type NestedTypeInfo {
   )
 }
 
+// Type to track input types that need to be generated
+type InputTypeInfo {
+  InputTypeInfo(
+    type_name: String,
+    input_fields: List(schema.InputValue),
+    field_types: dict.Dict(String, schema.Type),
+  )
+}
+
 // --- CONSTANTS ---------------------------------------------------------------
 
 const indent = 2
@@ -199,21 +208,39 @@ pub fn generate_operation(
   let decoder =
     generate_decoder_with_schema(response_type_name, field_types, schema_data.types)
 
-  // Generate function
+  // Collect Input types from variables
   let variables = parser.get_variables(operation)
+  use input_types <- result.try(collect_input_types(variables, schema_data.types))
+
+  // Generate Input type definitions and serializers
+  let input_docs =
+    input_types
+    |> list.map(fn(input_info) {
+      let type_doc = generate_input_type_definition(input_info)
+      let serializer_doc = generate_input_serializer(input_info)
+      [type_doc, serializer_doc]
+    })
+    |> list.flatten
+
+  // Generate function
   let function_def =
     generate_function(
       operation_name,
       response_type_name,
       variables,
       build_query_string(operation),
+      schema_data.types,
     )
 
   // Build imports
   let imports = imports_doc()
 
   // Combine all code using doc combinators
-  let all_docs = [imports, ..nested_docs] |> list.append([type_def, decoder, function_def])
+  // Order: imports, input types, nested types, response type, response decoder, function
+  let all_docs =
+    [imports, ..input_docs]
+    |> list.append(nested_docs)
+    |> list.append([type_def, decoder, function_def])
   let code =
     all_docs
     |> doc.join(with: doc.lines(2))
@@ -321,6 +348,100 @@ fn get_base_type_name(type_ref: schema.TypeRef) -> String {
     schema.NamedType(name, _) -> name
     schema.NonNullType(inner) -> get_base_type_name(inner)
     schema.ListType(inner) -> get_base_type_name(inner)
+  }
+}
+
+// Collect all InputObject types used in variables
+fn collect_input_types(
+  variables: List(parser.Variable),
+  schema_types: dict.Dict(String, schema.Type),
+) -> Result(List(InputTypeInfo), Error) {
+  variables
+  |> list.try_map(fn(var) {
+    use schema_type_ref <- result.try(
+      type_mapping.parser_type_to_schema_type_with_schema(
+        var.type_ref,
+        schema_types,
+      ),
+    )
+    collect_input_types_from_type_ref(schema_type_ref, schema_types, [])
+  })
+  |> result.map(list.flatten)
+  |> result.map(fn(input_types) {
+    // Deduplicate by type name
+    input_types
+    |> list.fold(dict.new(), fn(acc, info) {
+      dict.insert(acc, info.type_name, info)
+    })
+    |> dict.values
+  })
+}
+
+// Recursively collect InputObject types from a type reference
+fn collect_input_types_from_type_ref(
+  type_ref: schema.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
+  collected: List(InputTypeInfo),
+) -> Result(List(InputTypeInfo), Error) {
+  case type_ref {
+    schema.NamedType(name, kind) -> {
+      case kind {
+        schema.InputObject -> {
+          // Check if we've already collected this type (avoid infinite recursion)
+          let already_collected =
+            list.any(collected, fn(info) { info.type_name == name })
+
+          case already_collected {
+            True -> Ok(collected)
+            False -> {
+              // Look up the InputObject type in schema
+              use input_type <- result.try(
+                dict.get(schema_types, name)
+                |> result.map_error(fn(_) {
+                  error.InvalidSchemaResponse("InputObject type not found: " <> name)
+                }),
+              )
+
+              case input_type {
+                schema.InputObjectType(_, input_fields, _) -> {
+                  // Create InputTypeInfo
+                  let info =
+                    InputTypeInfo(
+                      type_name: name,
+                      input_fields: input_fields,
+                      field_types: schema_types,
+                    )
+
+                  // Recursively collect nested InputObject types
+                  use nested <- result.try(
+                    input_fields
+                    |> list.try_map(fn(field) {
+                      collect_input_types_from_type_ref(
+                        field.type_ref,
+                        schema_types,
+                        [info, ..collected],
+                      )
+                    })
+                    |> result.map(list.flatten),
+                  )
+
+                  Ok([info, ..nested])
+                }
+                _ ->
+                  Error(error.InvalidSchemaResponse(
+                    "Expected InputObject type: " <> name,
+                  ))
+              }
+            }
+          }
+        }
+        _ -> Ok(collected)
+      }
+    }
+    schema.NonNullType(inner) ->
+      collect_input_types_from_type_ref(inner, schema_types, collected)
+    schema.ListType(inner) ->
+      collect_input_types_from_type_ref(inner, schema_types, collected)
   }
 }
 
@@ -492,12 +613,176 @@ fn generate_field_decoder(gleam_type: type_mapping.GleamType) -> String {
   }
 }
 
+// Generate Input type definition
+fn generate_input_type_definition(input_info: InputTypeInfo) -> Document {
+  let field_docs =
+    input_info.input_fields
+    |> list.map(fn(input_value) {
+      let sanitized_name = sanitize_field_name(input_value.name)
+      use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
+        input_value.type_ref,
+      ))
+      let field_doc =
+        doc.concat([
+          doc.from_string(sanitized_name <> ": "),
+          doc.from_string(type_mapping.to_gleam_type_string(gleam_type)),
+        ])
+      Ok(field_doc)
+    })
+    |> list.filter_map(fn(r) { r })
+
+  [
+    doc.from_string("pub type " <> input_info.type_name <> " {"),
+    [
+      doc.line,
+      call_doc(input_info.type_name, field_docs),
+    ]
+      |> doc.concat
+      |> doc.nest(by: indent),
+    doc.line,
+    doc.from_string("}"),
+  ]
+  |> doc.concat
+  |> doc.group
+}
+
+// Generate Input serializer function
+fn generate_input_serializer(input_info: InputTypeInfo) -> Document {
+  let serializer_name = snake_case(input_info.type_name) <> "_to_json"
+  let param_name = "input"
+
+  let field_entries =
+    input_info.input_fields
+    |> list.map(fn(input_value) {
+      let sanitized_name = sanitize_field_name(input_value.name)
+      use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
+        input_value.type_ref,
+      ))
+
+      let value_expr =
+        encode_input_field_value(
+          param_name <> "." <> sanitized_name,
+          gleam_type,
+          input_value.type_ref,
+          input_info.field_types,
+        )
+
+      Ok(
+        doc.concat([
+          doc.from_string("#("),
+          string_doc(input_value.name),
+          doc.from_string(", "),
+          value_expr,
+          doc.from_string(")"),
+        ]),
+      )
+    })
+    |> list.filter_map(fn(r) { r })
+
+  let body =
+    call_doc("json.object", [comma_list("[", field_entries, "]")])
+
+  doc.concat([
+    doc.from_string("fn " <> serializer_name <> "("),
+    doc.from_string(param_name <> ": " <> input_info.type_name),
+    doc.from_string(") -> json.Json "),
+    block([body]),
+  ])
+}
+
+// Encode a field value for Input serialization
+fn encode_input_field_value(
+  field_access: String,
+  gleam_type: type_mapping.GleamType,
+  type_ref: schema.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
+) -> Document {
+  case gleam_type {
+    type_mapping.StringType ->
+      call_doc("json.string", [doc.from_string(field_access)])
+    type_mapping.IntType ->
+      call_doc("json.int", [doc.from_string(field_access)])
+    type_mapping.FloatType ->
+      call_doc("json.float", [doc.from_string(field_access)])
+    type_mapping.BoolType ->
+      call_doc("json.bool", [doc.from_string(field_access)])
+    type_mapping.ListType(inner) -> {
+      let base_type_name = get_base_type_name(type_ref)
+      case dict.get(schema_types, base_type_name) {
+        Ok(schema.InputObjectType(_, _, _)) -> {
+          // List of InputObjects
+          call_doc("json.array", [
+            doc.from_string("from: " <> field_access),
+            doc.from_string("of: " <> snake_case(base_type_name) <> "_to_json"),
+          ])
+        }
+        _ -> {
+          // List of scalars
+          let of_fn = case inner {
+            type_mapping.StringType -> "json.string"
+            type_mapping.IntType -> "json.int"
+            type_mapping.FloatType -> "json.float"
+            type_mapping.BoolType -> "json.bool"
+            _ -> "json.string"
+          }
+          call_doc("json.array", [
+            doc.from_string("from: " <> field_access),
+            doc.from_string("of: " <> of_fn),
+          ])
+        }
+      }
+    }
+    type_mapping.OptionType(inner) -> {
+      let base_type_name = get_base_type_name(type_ref)
+      case dict.get(schema_types, base_type_name) {
+        Ok(schema.InputObjectType(_, _, _)) -> {
+          // Optional InputObject
+          call_doc("json.nullable", [
+            doc.from_string(field_access),
+            doc.from_string(snake_case(base_type_name) <> "_to_json"),
+          ])
+        }
+        _ -> {
+          // Optional scalar or list
+          let inner_encoder = case inner {
+            type_mapping.StringType -> "json.string"
+            type_mapping.IntType -> "json.int"
+            type_mapping.FloatType -> "json.float"
+            type_mapping.BoolType -> "json.bool"
+            type_mapping.ListType(_) -> {
+              // This is handled by recursion, but for now use a lambda
+              let of_fn = case inner {
+                type_mapping.ListType(type_mapping.StringType) -> "json.string"
+                type_mapping.ListType(type_mapping.IntType) -> "json.int"
+                type_mapping.ListType(type_mapping.FloatType) -> "json.float"
+                type_mapping.ListType(type_mapping.BoolType) -> "json.bool"
+                _ -> "json.string"
+              }
+              "fn(list) { json.array(from: list, of: " <> of_fn <> ") }"
+            }
+            _ -> "json.string"
+          }
+          call_doc("json.nullable", [
+            doc.from_string(field_access),
+            doc.from_string(inner_encoder),
+          ])
+        }
+      }
+    }
+    type_mapping.CustomType(name) -> {
+      // This is an InputObject
+      call_doc(snake_case(name) <> "_to_json", [doc.from_string(field_access)])
+    }
+  }
+}
+
 // Generate function
 fn generate_function(
   operation_name: String,
   response_type_name: String,
   variables: List(parser.Variable),
   query_string: String,
+  schema_types: dict.Dict(String, schema.Type),
 ) -> Document {
   let function_name = operation_name
 
@@ -508,10 +793,15 @@ fn generate_function(
       let var_param_docs =
         vars
         |> list.map(fn(var) {
-          use gleam_type <- result.try(
-            type_mapping.parser_type_to_schema_type(var.type_ref)
-            |> result.try(type_mapping.graphql_to_gleam),
+          use schema_type_ref <- result.try(
+            type_mapping.parser_type_to_schema_type_with_schema(
+              var.type_ref,
+              schema_types,
+            ),
           )
+          use gleam_type <- result.try(type_mapping.graphql_to_gleam(
+            schema_type_ref,
+          ))
           let param_name = snake_case(var.name)
           Ok(
             doc.from_string(
@@ -532,12 +822,23 @@ fn generate_function(
       let var_entry_docs =
         vars
         |> list.map(fn(var) {
-          use gleam_type <- result.try(
-            type_mapping.parser_type_to_schema_type(var.type_ref)
-            |> result.try(type_mapping.graphql_to_gleam),
+          use schema_type_ref <- result.try(
+            type_mapping.parser_type_to_schema_type_with_schema(
+              var.type_ref,
+              schema_types,
+            ),
           )
+          use gleam_type <- result.try(type_mapping.graphql_to_gleam(
+            schema_type_ref,
+          ))
           let param_name = snake_case(var.name)
-          let value_encoder = encode_variable_value(param_name, gleam_type)
+          let value_encoder =
+            encode_variable_value(
+              param_name,
+              gleam_type,
+              schema_type_ref,
+              schema_types,
+            )
           Ok(
             doc.concat([
               doc.from_string("#("),
@@ -667,6 +968,8 @@ fn generate_function(
 fn encode_variable_value(
   var_name: String,
   gleam_type: type_mapping.GleamType,
+  type_ref: schema.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
 ) -> Document {
   case gleam_type {
     type_mapping.StringType ->
@@ -676,25 +979,62 @@ fn encode_variable_value(
       call_doc("json.float", [doc.from_string(var_name)])
     type_mapping.BoolType -> call_doc("json.bool", [doc.from_string(var_name)])
     type_mapping.ListType(inner) -> {
-      let encoder = case inner {
-        type_mapping.StringType -> "json.string"
-        type_mapping.IntType -> "json.int"
-        type_mapping.FloatType -> "json.float"
-        type_mapping.BoolType -> "json.bool"
-        _ -> "json.string"
+      let base_type_name = get_base_type_name(type_ref)
+      case dict.get(schema_types, base_type_name) {
+        Ok(schema.InputObjectType(_, _, _)) -> {
+          // List of InputObjects
+          call_doc("json.array", [
+            doc.from_string("from: " <> var_name),
+            doc.from_string("of: " <> snake_case(base_type_name) <> "_to_json"),
+          ])
+        }
+        _ -> {
+          // List of scalars
+          let encoder = case inner {
+            type_mapping.StringType -> "json.string"
+            type_mapping.IntType -> "json.int"
+            type_mapping.FloatType -> "json.float"
+            type_mapping.BoolType -> "json.bool"
+            _ -> "json.string"
+          }
+          call_doc("json.array", [
+            doc.from_string("from: " <> var_name),
+            doc.from_string("of: " <> encoder),
+          ])
+        }
       }
-      call_doc("json.array", [
-        doc.from_string("from: " <> var_name),
-        doc.from_string("of: " <> encoder),
-      ])
     }
-    type_mapping.OptionType(inner) ->
-      call_doc("json.nullable", [
-        doc.from_string(var_name),
-        encode_variable_value("value", inner),
-      ])
-    type_mapping.CustomType(_) ->
-      call_doc("json.string", [doc.from_string(var_name)])
+    type_mapping.OptionType(inner) -> {
+      let base_type_name = get_base_type_name(type_ref)
+      case dict.get(schema_types, base_type_name) {
+        Ok(schema.InputObjectType(_, _, _)) -> {
+          // Optional InputObject
+          call_doc("json.nullable", [
+            doc.from_string(var_name),
+            doc.from_string(snake_case(base_type_name) <> "_to_json"),
+          ])
+        }
+        _ -> {
+          // Optional scalar or list - need to unwrap the type_ref
+          let inner_type_ref = case type_ref {
+            schema.NonNullType(t) -> t
+            t -> t
+          }
+          call_doc("json.nullable", [
+            doc.from_string(var_name),
+            encode_variable_value("value", inner, inner_type_ref, schema_types),
+          ])
+        }
+      }
+    }
+    type_mapping.CustomType(name) -> {
+      // Check if this is an InputObject
+      case dict.get(schema_types, name) {
+        Ok(schema.InputObjectType(_, _, _)) ->
+          call_doc(snake_case(name) <> "_to_json", [doc.from_string(var_name)])
+        _ -> call_doc("json.string", [doc.from_string(var_name)])
+      }
+    }
   }
 }
 

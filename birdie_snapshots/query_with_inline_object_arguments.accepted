@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with inline object arguments
+file: ./test/codegen_test.gleam
+test_name: generate_inline_object_arguments_test
 ---
 import gleam/dynamic/decode
 import gleam/http
