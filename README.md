@@ -2,9 +2,9 @@
 
 A type-safe GraphQL client generator for Gleam, inspired by [squirrel](https://github.com/giacomocavalieri/squirrel).
 
-Squall parses `.gql` files in your project, introspects your GraphQL endpoint, and generates fully type-safe Gleam code with decoders, eliminating runtime errors and keeping your GraphQL queries in sync with your schema.
+Squall parses `.gql` files in your project, introspects your GraphQL endpoint, and generates fully type-safe Gleam code with decoders, and keeps your GraphQL queries in sync with your schema.
 
-> **⚠️ Warning**: This project is in early development and may contain bugs. Use at your own risk.
+> **⚠️ Warning**: This project is in early development and may contain bugs. Also hasn't been published yet.
 
 ## Features
 
