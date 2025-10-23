@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import squall/internal/error.{type Error}
@@ -78,6 +79,42 @@ pub fn parser_type_to_schema_type(
     }
     parser.NonNullTypeRef(inner) -> {
       use inner_schema <- result.try(parser_type_to_schema_type(inner))
+      Ok(schema.NonNullType(inner_schema))
+    }
+  }
+}
+
+// Convert parser TypeRef to schema TypeRef with schema lookup for accurate kinds
+pub fn parser_type_to_schema_type_with_schema(
+  parser_type: parser.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
+) -> Result(schema.TypeRef, Error) {
+  case parser_type {
+    parser.NamedTypeRef(name) -> {
+      // Look up the type in schema to get the actual kind
+      let kind = case dict.get(schema_types, name) {
+        Ok(schema.ScalarType(_, _)) -> schema.Scalar
+        Ok(schema.ObjectType(_, _, _)) -> schema.Object
+        Ok(schema.InterfaceType(_, _, _)) -> schema.Interface
+        Ok(schema.UnionType(_, _, _)) -> schema.Union
+        Ok(schema.EnumType(_, _, _)) -> schema.Enum
+        Ok(schema.InputObjectType(_, _, _)) -> schema.InputObject
+        Error(_) -> schema.Scalar
+      }
+      Ok(schema.NamedType(name, kind))
+    }
+    parser.ListTypeRef(inner) -> {
+      use inner_schema <- result.try(parser_type_to_schema_type_with_schema(
+        inner,
+        schema_types,
+      ))
+      Ok(schema.ListType(inner_schema))
+    }
+    parser.NonNullTypeRef(inner) -> {
+      use inner_schema <- result.try(parser_type_to_schema_type_with_schema(
+        inner,
+        schema_types,
+      ))
       Ok(schema.NonNullType(inner_schema))
     }
   }

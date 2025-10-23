@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with multiple root fields and mixed arguments
+file: ./test/codegen_test.gleam
+test_name: generate_multiple_root_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http

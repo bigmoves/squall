@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with nested types generation
+file: ./test/codegen_test.gleam
+test_name: generate_query_with_nested_types_test
 ---
 import gleam/dynamic/decode
 import gleam/http

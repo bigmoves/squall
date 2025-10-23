@@ -1,0 +1,82 @@
+---
+version: 1.4.1
+title: Mutation with InputObject variable
+---
+import gleam/dynamic/decode
+import gleam/http
+import gleam/http/request
+import gleam/httpc
+import gleam/json
+import gleam/list
+import gleam/option.{type Option}
+import gleam/result
+import squall
+
+pub type ProfileInput {
+  ProfileInput(display_name: Option(String), description: Option(String))
+}
+
+fn profile_input_to_json(input: ProfileInput) -> json.Json {
+  json.object(
+    [
+      #("displayName", json.nullable(input.display_name, json.string)),
+      #("description", json.nullable(input.description, json.string)),
+    ],
+  )
+}
+
+pub type Profile {
+  Profile(id: String, display_name: Option(String))
+}
+
+pub fn profile_decoder() -> decode.Decoder(Profile) {
+  use id <- decode.field("id", decode.string)
+  use display_name <- decode.field("displayName", decode.optional(decode.string))
+  decode.success(Profile(id: id, display_name: display_name))
+}
+
+pub type UpdateProfileResponse {
+  UpdateProfileResponse(update_profile: Option(Profile))
+}
+
+pub fn update_profile_response_decoder() -> decode.Decoder(UpdateProfileResponse) {
+  use update_profile <- decode.field("updateProfile", decode.optional(profile_decoder()))
+  decode.success(UpdateProfileResponse(update_profile: update_profile))
+}
+
+pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(UpdateProfileResponse, String) {
+  let query =
+    "mutation UpdateProfile($input: ProfileInput!) { updateProfile(input: $input) { id displayName } }"
+  let variables =
+    json.object([#("input", profile_input_to_json(input))])
+  let body =
+    json.object([#("query", json.string(query)), #("variables", variables)])
+  use req <- result.try(
+    request.to(client.endpoint)
+    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+  )
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
+  let req =
+    list.fold(client.headers, req, fn(r, header) {
+      request.set_header(r, header.0, header.1)
+    })
+  use resp <- result.try(
+    httpc.send(req)
+    |> result.map_error(fn(_) { "HTTP request failed" }),
+  )
+  use json_value <- result.try(
+    json.parse(from: resp.body, using: decode.dynamic)
+    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
+  )
+  let data_and_response_decoder = {
+    use data <- decode.field("data", update_profile_response_decoder())
+    decode.success(data)
+  }
+  decode.run(json_value, data_and_response_decoder)
+  |> result.map_error(fn(_) { "Failed to decode response data" })
+}
+

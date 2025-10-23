@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Mutation function generation
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_test
 ---
 import gleam/dynamic/decode
 import gleam/http

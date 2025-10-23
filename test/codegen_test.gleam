@@ -720,3 +720,214 @@ pub fn generate_multiple_root_fields_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate mutation with InputObject variable
+pub fn generate_mutation_with_input_object_test() {
+  let mutation_source =
+    "
+    mutation UpdateProfile($input: ProfileInput!) {
+      updateProfile(input: $input) {
+        id
+        displayName
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(mutation_source)
+
+  // Define InputObject type in schema
+  let profile_input_fields = [
+    schema.InputValue(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "description",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+  ]
+
+  let profile_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Profile", schema.ObjectType("Profile", profile_fields, None)),
+        #(
+          "ProfileInput",
+          schema.InputObjectType("ProfileInput", profile_input_fields, None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "updateProfile",
+                schema.NamedType("Profile", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "ProfileInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("update_profile", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with InputObject variable")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate mutation with nested InputObject types
+pub fn generate_mutation_with_nested_input_object_test() {
+  let mutation_source =
+    "
+    mutation UpdateProfile($input: ProfileInput!) {
+      updateProfile(input: $input) {
+        id
+        displayName
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(mutation_source)
+
+  // Define nested InputObject types
+  let blob_input_fields = [
+    schema.InputValue(
+      "data",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      None,
+    ),
+    schema.InputValue(
+      "mimeType",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      None,
+    ),
+  ]
+
+  let profile_input_fields = [
+    schema.InputValue(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "avatar",
+      schema.NamedType("BlobInput", schema.InputObject),
+      None,
+    ),
+    schema.InputValue(
+      "interests",
+      schema.ListType(schema.NonNullType(schema.NamedType(
+        "String",
+        schema.Scalar,
+      ))),
+      None,
+    ),
+  ]
+
+  let profile_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Profile", schema.ObjectType("Profile", profile_fields, None)),
+        #(
+          "ProfileInput",
+          schema.InputObjectType("ProfileInput", profile_input_fields, None),
+        ),
+        #(
+          "BlobInput",
+          schema.InputObjectType("BlobInput", blob_input_fields, None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "updateProfile",
+                schema.NamedType("Profile", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "ProfileInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("update_profile", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with nested InputObject types")
+    }
+    Error(_) -> Nil
+  }
+}
