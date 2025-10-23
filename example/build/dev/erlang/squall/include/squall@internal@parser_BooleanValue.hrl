@@ -1,0 +1,1 @@
+-record(boolean_value, {value :: boolean()}).

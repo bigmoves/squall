@@ -1,0 +1,1 @@
+-record(cannot_read_file, {file :: binary(), reason :: binary()}).

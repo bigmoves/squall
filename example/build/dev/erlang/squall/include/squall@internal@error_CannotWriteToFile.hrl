@@ -1,0 +1,1 @@
+-record(cannot_write_to_file, {file :: binary(), reason :: binary()}).

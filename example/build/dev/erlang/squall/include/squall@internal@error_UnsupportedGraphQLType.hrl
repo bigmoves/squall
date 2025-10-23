@@ -1,0 +1,1 @@
+-record(unsupported_graph_q_l_type, {file :: binary(), type_name :: binary()}).

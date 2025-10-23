@@ -1,0 +1,1 @@
+-record(invalid_type_mapping, {reason :: binary()}).

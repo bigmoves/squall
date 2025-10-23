@@ -1,0 +1,1 @@
+-record(custom_type, {name :: binary()}).

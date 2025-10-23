@@ -1,0 +1,1 @@
+-record(flex_break, {unbroken :: binary(), broken :: binary()}).

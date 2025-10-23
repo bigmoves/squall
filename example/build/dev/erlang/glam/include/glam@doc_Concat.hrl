@@ -1,0 +1,1 @@
+-record(concat, {docs :: list(glam@doc:document())}).

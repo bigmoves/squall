@@ -1,0 +1,105 @@
+import gleam/dynamic
+import gleam/http
+import gleam/http/request
+import gleam/httpc
+import gleam/json
+import gleam/option.{type Option}
+import gleam/result
+
+pub type Character {
+  Character(
+    id: Option(String),
+    name: Option(String),
+    status: Option(String),
+    species: Option(String),
+    type_: Option(String),
+    gender: Option(String),
+  )
+}
+
+pub fn character_decoder() -> dynamic.Decoder(Character) {
+  fn(data: dynamic.Dynamic) -> Result(Character, List(dynamic.DecodeError)) {
+    use id <- result.try(dynamic.field("id", dynamic.optional(dynamic.string))(
+      data,
+    ))
+    use name <- result.try(dynamic.field(
+      "name",
+      dynamic.optional(dynamic.string),
+    )(data))
+    use status <- result.try(dynamic.field(
+      "status",
+      dynamic.optional(dynamic.string),
+    )(data))
+    use species <- result.try(dynamic.field(
+      "species",
+      dynamic.optional(dynamic.string),
+    )(data))
+    use type_ <- result.try(dynamic.field(
+      "type",
+      dynamic.optional(dynamic.string),
+    )(data))
+    use gender <- result.try(dynamic.field(
+      "gender",
+      dynamic.optional(dynamic.string),
+    )(data))
+    Ok(Character(
+      id: id,
+      name: name,
+      status: status,
+      species: species,
+      type_: type_,
+      gender: gender,
+    ))
+  }
+}
+
+pub type GetCharacterResponse {
+  GetCharacterResponse(character: Option(Character))
+}
+
+pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse) {
+  fn(data: dynamic.Dynamic) -> Result(
+    GetCharacterResponse,
+    List(dynamic.DecodeError),
+  ) {
+    use character <- result.try(dynamic.field(
+      "character",
+      dynamic.optional(character_decoder()),
+    )(data))
+    Ok(GetCharacterResponse(character: character))
+  }
+}
+
+pub fn get_character(
+  endpoint: String,
+  id: String,
+) -> Result(GetCharacterResponse, String) {
+  let query =
+    "query GetCharacter($id: ID!) { character { id name status species type gender } }"
+  let variables = json.object([#("id", json.string(id))])
+  let body =
+    json.object([#("query", json.string(query)), #("variables", variables)])
+  use req <- result.try(
+    request.to(endpoint)
+    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+  )
+  let req =
+    req
+    |> request.set_method(http.Post)
+    |> request.set_body(json.to_string(body))
+    |> request.set_header("content-type", "application/json")
+  use resp <- result.try(
+    httpc.send(req)
+    |> result.map_error(fn(_) { "HTTP request failed" }),
+  )
+  use json_value <- result.try(
+    json.decode(from: resp.body, using: dynamic.dynamic)
+    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
+  )
+  use data_field <- result.try(
+    dynamic.field("data", dynamic.dynamic)(json_value)
+    |> result.map_error(fn(_) { "No data field in response" }),
+  )
+  get_character_response_decoder()(data_field)
+  |> result.map_error(fn(_) { "Failed to decode response data" })
+}

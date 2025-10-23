@@ -1,0 +1,1 @@
+-record(list_value, {values :: list(squall@internal@parser:value())}).

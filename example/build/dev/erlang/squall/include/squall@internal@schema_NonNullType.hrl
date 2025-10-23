@@ -1,0 +1,1 @@
+-record(non_null_type, {of_type :: squall@internal@schema:type_ref()}).

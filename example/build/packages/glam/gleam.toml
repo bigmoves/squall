@@ -1,0 +1,23 @@
+name = "glam"
+version = "2.0.2"
+description = "A package to help you easily pretty print structured data"
+
+licences = ["Apache-2.0"]
+repository = { type = "github", user = "giacomocavalieri", repo = "glam" }
+gleam = ">= 0.33.0"
+
+[dependencies]
+gleam_stdlib = "~> 0.34 or ~> 1.0"
+
+[dev-dependencies]
+birdie = "~> 1.0"
+gleeunit = "~> 1.0"
+
+[documentation]
+pages = [
+    { title = "Learning materials", path = "learning_materials.html", source = "./tutorials/README.md" },
+    { title = "", path = "pretty_printing_glamorous_lists.html", source = "./tutorials/pretty_printing_glamorous_lists.md" },
+    { title = "", path = "pretty_printing_todo_lists.html", source = "./tutorials/pretty_printing_todo_lists.md" },
+    { title = "", path = "pretty_printing_JSON.html", source = "./tutorials/pretty_printing_JSON.md" },
+    { title = "", path = "pretty_printing_lovely_error_messages.html", source = "./tutorials/pretty_printing_lovely_error_messages.md" },
+]

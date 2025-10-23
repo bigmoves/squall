@@ -1,0 +1,69 @@
+---
+version: 1.2.0
+title: Mutation function generation
+---
+import gleam/dynamic
+import gleam/http
+import gleam/http/request
+import gleam/httpc
+import gleam/json
+import gleam/option.{type Option}
+import gleam/result
+
+pub type User {
+  User(id: String, name: String)
+}
+
+pub fn user_decoder() -> dynamic.Decoder(User) {
+  fn(data: dynamic.Dynamic) -> Result(User, List(dynamic.DecodeError)) {
+    use id <- result.try(dynamic.field("id", dynamic.string)(data))
+    use name <- result.try(dynamic.field("name", dynamic.string)(data))
+    Ok(User(id: id, name: name))
+  }
+}
+
+pub type CreateUserResponse {
+  CreateUserResponse(createUser: Option(User))
+}
+
+pub fn create_user_response_decoder() -> dynamic.Decoder(CreateUserResponse) {
+  fn(data: dynamic.Dynamic) -> Result(CreateUserResponse, List(dynamic.DecodeError)) {
+    use createUser <- result.try(dynamic.field(
+      "createUser",
+      dynamic.optional(user_decoder()),
+    )(data))
+    Ok(CreateUserResponse(createUser: createUser))
+  }
+}
+
+pub fn create_user(endpoint: String, name: String) -> Result(
+  CreateUserResponse,
+  String,
+) {
+  let query = "mutation CreateUser($name: String!) { createUser { id name } }"
+  let variables = json.object([#("name", json.string(name))])
+  let body =
+  json.object([#("query", json.string(query)), #("variables", variables)])
+  use req <- result.try(
+    request.to(endpoint)
+    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+  )
+  let req = req
+  |> request.set_method(http.Post)
+  |> request.set_body(json.to_string(body))
+  |> request.set_header("content-type", "application/json")
+  use resp <- result.try(
+    httpc.send(req)
+    |> result.map_error(fn(_) { "HTTP request failed" }),
+  )
+  use json_value <- result.try(
+    json.decode(from: resp.body, using: dynamic.dynamic)
+    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
+  )
+  use data_field <- result.try(
+    dynamic.field("data", dynamic.dynamic)(json_value)
+    |> result.map_error(fn(_) { "No data field in response" }),
+  )
+  create_user_response_decoder()(data_field)
+  |> result.map_error(fn(_) { "Failed to decode response data" })
+}

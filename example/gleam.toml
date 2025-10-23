@@ -1,0 +1,12 @@
+name = "example"
+version = "0.1.0"
+description = "Example project using Squall with Rick and Morty API"
+
+[dependencies]
+gleam_stdlib = ">= 0.34.0 and < 0.40.0"
+gleam_json = ">= 1.0.0 and < 2.0.0"
+gleam_http = ">= 3.0.0 and < 4.0.0"
+gleam_httpc = ">= 2.0.0 and < 3.0.0"
+
+[dev-dependencies]
+squall = { path = "../" }

@@ -1,0 +1,1 @@
+-record(code_generation_failed, {reason :: binary()}).

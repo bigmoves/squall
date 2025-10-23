@@ -1,0 +1,1 @@
+-record(non_null_type_ref, {inner :: squall@internal@parser:type_ref()}).

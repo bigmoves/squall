@@ -1,0 +1,1 @@
+-record(invalid_schema_response, {reason :: binary()}).
