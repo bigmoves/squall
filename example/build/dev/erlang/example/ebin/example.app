@@ -6,8 +6,7 @@
                     gleam_stdlib,
                     squall]},
     {description, "Example project using Squall with Rick and Morty API"},
-    {modules, [example,
-               graphql@get_character,
-               graphql@get_characters]},
+    {modules, [example_with_vars,
+               graphql@multi_query_with_vars]},
     {registered, []}
 ]}.

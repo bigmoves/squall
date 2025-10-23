@@ -660,6 +660,7 @@ fn parse_list_value(
 
   case token_pos.token {
     RightBracket -> Ok(#(ListValue(list.reverse(acc)), advance(state)))
+    Comma -> parse_list_value(advance(state), acc)
     _ -> {
       use #(value, state) <- result.try(parse_value(state))
       parse_list_value(state, [value, ..acc])
@@ -675,6 +676,7 @@ fn parse_object_value(
 
   case token_pos.token {
     RightBrace -> Ok(#(ObjectValue(list.reverse(acc)), advance(state)))
+    Comma -> parse_object_value(advance(state), acc)
     Name(_) -> {
       use #(name, state) <- result.try(parse_name(state))
       use state <- result.try(expect_token(state, Colon, "object field value"))

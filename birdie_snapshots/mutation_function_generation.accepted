@@ -1,6 +1,8 @@
 ---
 version: 1.2.0
 title: Mutation function generation
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_test
 ---
 import gleam/dynamic
 import gleam/http
@@ -23,16 +25,16 @@ pub fn user_decoder() -> dynamic.Decoder(User) {
 }
 
 pub type CreateUserResponse {
-  CreateUserResponse(createUser: Option(User))
+  CreateUserResponse(create_user: Option(User))
 }
 
 pub fn create_user_response_decoder() -> dynamic.Decoder(CreateUserResponse) {
   fn(data: dynamic.Dynamic) -> Result(CreateUserResponse, List(dynamic.DecodeError)) {
-    use createUser <- result.try(dynamic.field(
+    use create_user <- result.try(dynamic.field(
       "createUser",
       dynamic.optional(user_decoder()),
     )(data))
-    Ok(CreateUserResponse(createUser: createUser))
+    Ok(CreateUserResponse(create_user: create_user))
   }
 }
 
@@ -40,7 +42,8 @@ pub fn create_user(endpoint: String, name: String) -> Result(
   CreateUserResponse,
   String,
 ) {
-  let query = "mutation CreateUser($name: String!) { createUser { id name } }"
+  let query =
+  "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }"
   let variables = json.object([#("name", json.string(name))])
   let body =
   json.object([#("query", json.string(query)), #("variables", variables)])

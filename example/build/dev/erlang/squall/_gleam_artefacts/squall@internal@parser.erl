@@ -675,7 +675,7 @@ tokenize(Source) ->
     _pipe = tokenize_helper(Source, 1, 1, []),
     gleam@result:map(_pipe, fun lists:reverse/1).
 
--file("src/squall/internal/parser.gleam", 709).
+-file("src/squall/internal/parser.gleam", 711).
 ?DOC(false).
 -spec peek_token(parser_state()) -> {ok, token_position()} |
     {error, squall@internal@error:error()}.
@@ -692,7 +692,7 @@ peek_token(State) ->
                     <<"Unexpected end of input"/utf8>>}}
     end.
 
--file("src/squall/internal/parser.gleam", 716).
+-file("src/squall/internal/parser.gleam", 718).
 ?DOC(false).
 -spec advance(parser_state()) -> parser_state().
 advance(State) ->
@@ -738,7 +738,7 @@ parse_optional_name(State) ->
             {none, State}
     end.
 
--file("src/squall/internal/parser.gleam", 693).
+-file("src/squall/internal/parser.gleam", 695).
 ?DOC(false).
 -spec parse_name(parser_state()) -> {ok, {binary(), parser_state()}} |
     {error, squall@internal@error:error()}.
@@ -758,7 +758,7 @@ parse_name(State) ->
             end end
     ).
 
--file("src/squall/internal/parser.gleam", 738).
+-file("src/squall/internal/parser.gleam", 740).
 ?DOC(false).
 -spec tokens_equal(token(), token()) -> boolean().
 tokens_equal(A, B) ->
@@ -806,7 +806,7 @@ tokens_equal(A, B) ->
             false
     end.
 
--file("src/squall/internal/parser.gleam", 757).
+-file("src/squall/internal/parser.gleam", 759).
 ?DOC(false).
 -spec token_to_string(token()) -> binary().
 token_to_string(Token) ->
@@ -863,7 +863,7 @@ token_to_string(Token) ->
             <<"end of input"/utf8>>
     end.
 
--file("src/squall/internal/parser.gleam", 720).
+-file("src/squall/internal/parser.gleam", 722).
 ?DOC(false).
 -spec expect_token(parser_state(), token(), binary()) -> {ok, parser_state()} |
     {error, squall@internal@error:error()}.
@@ -1021,7 +1021,7 @@ parse_variable_definitions(State) ->
             {ok, {[], State}}
     end.
 
--file("src/squall/internal/parser.gleam", 779).
+-file("src/squall/internal/parser.gleam", 781).
 ?DOC(false).
 -spec skip_insignificant(parser_state()) -> parser_state().
 skip_insignificant(State) ->
@@ -1174,6 +1174,9 @@ parse_list_value(State, Acc) ->
                 right_bracket ->
                     {ok, {{list_value, lists:reverse(Acc)}, advance(State)}};
 
+                comma ->
+                    parse_list_value(advance(State), Acc);
+
                 _ ->
                     gleam@result:'try'(
                         parse_value(State),
@@ -1310,7 +1313,7 @@ parse_arguments(State) ->
             {ok, {[], State}}
     end.
 
--file("src/squall/internal/parser.gleam", 670).
+-file("src/squall/internal/parser.gleam", 671).
 ?DOC(false).
 -spec parse_object_value(parser_state(), list({binary(), value()})) -> {ok,
         {value(), parser_state()}} |
@@ -1321,6 +1324,9 @@ parse_object_value(State, Acc) ->
         fun(Token_pos) -> case erlang:element(2, Token_pos) of
                 right_brace ->
                     {ok, {{object_value, lists:reverse(Acc)}, advance(State)}};
+
+                comma ->
+                    parse_object_value(advance(State), Acc);
 
                 {name, _} ->
                     gleam@result:'try'(

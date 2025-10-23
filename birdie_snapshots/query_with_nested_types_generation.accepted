@@ -41,7 +41,8 @@ pub fn get_character(endpoint: String, id: String) -> Result(
   GetCharacterResponse,
   String,
 ) {
-  let query = "query GetCharacter($id: ID!) { character { id name status } }"
+  let query =
+  "query GetCharacter($id: ID!) { character(id: $id) { id name status } }"
   let variables = json.object([#("id", json.string(id))])
   let body =
   json.object([#("query", json.string(query)), #("variables", variables)])

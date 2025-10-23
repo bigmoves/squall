@@ -1,5 +1,7 @@
 import glam/doc.{type Document}
 import gleam/dict
+import gleam/float
+import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
@@ -99,11 +101,12 @@ fn string_doc(content: String) -> Document {
   |> doc.concat
 }
 
-/// Sanitize field names by appending underscore to reserved keywords
+/// Sanitize field names by converting to snake_case and appending underscore to reserved keywords
 fn sanitize_field_name(name: String) -> String {
-  case list.contains(reserved_keywords, name) {
-    True -> name <> "_"
-    False -> name
+  let snake_cased = snake_case(name)
+  case list.contains(reserved_keywords, snake_cased) {
+    True -> snake_cased <> "_"
+    False -> snake_cased
   }
 }
 
@@ -511,9 +514,10 @@ fn generate_function(
             type_mapping.parser_type_to_schema_type(var.type_ref)
             |> result.then(type_mapping.graphql_to_gleam),
           )
+          let param_name = snake_case(var.name)
           Ok(
             doc.from_string(
-              var.name <> ": " <> type_mapping.to_gleam_type_string(gleam_type),
+              param_name <> ": " <> type_mapping.to_gleam_type_string(gleam_type),
             ),
           )
         })
@@ -534,7 +538,8 @@ fn generate_function(
             type_mapping.parser_type_to_schema_type(var.type_ref)
             |> result.then(type_mapping.graphql_to_gleam),
           )
-          let value_encoder = encode_variable_value(var.name, gleam_type)
+          let param_name = snake_case(var.name)
+          let value_encoder = encode_variable_value(param_name, gleam_type)
           Ok(
             doc.concat([
               doc.from_string("#("),
@@ -668,11 +673,19 @@ fn encode_variable_value(
     type_mapping.FloatType ->
       call_doc("json.float", [doc.from_string(var_name)])
     type_mapping.BoolType -> call_doc("json.bool", [doc.from_string(var_name)])
-    type_mapping.ListType(_inner) ->
+    type_mapping.ListType(inner) -> {
+      let encoder = case inner {
+        type_mapping.StringType -> "json.string"
+        type_mapping.IntType -> "json.int"
+        type_mapping.FloatType -> "json.float"
+        type_mapping.BoolType -> "json.bool"
+        _ -> "json.string"
+      }
       call_doc("json.array", [
         doc.from_string("from: " <> var_name),
-        doc.from_string("of: json.string"),
+        doc.from_string("of: " <> encoder),
       ])
+    }
     type_mapping.OptionType(inner) ->
       call_doc("json.nullable", [
         doc.from_string(var_name),
@@ -720,10 +733,11 @@ fn build_selection_set(selections: List(parser.Selection)) -> String {
     selections
     |> list.map(fn(selection) {
       case selection {
-        parser.FieldSelection(name, _alias, _args, nested) -> {
+        parser.FieldSelection(name, _alias, args, nested) -> {
+          let args_str = format_arguments(args)
           case nested {
-            [] -> name
-            subs -> name <> " " <> build_selection_set(subs)
+            [] -> name <> args_str
+            subs -> name <> args_str <> " " <> build_selection_set(subs)
           }
         }
       }
@@ -755,6 +769,51 @@ fn to_pascal_case(s: String) -> String {
   |> string.split("_")
   |> list.map(capitalize)
   |> string.join("")
+}
+
+fn format_value(value: parser.Value) -> String {
+  case value {
+    parser.IntValue(i) -> int.to_string(i)
+    parser.FloatValue(f) -> float.to_string(f)
+    parser.StringValue(s) -> "\"" <> s <> "\""
+    parser.BooleanValue(True) -> "true"
+    parser.BooleanValue(False) -> "false"
+    parser.NullValue -> "null"
+    parser.VariableValue(name) -> "$" <> name
+    parser.ListValue(values) -> {
+      let formatted_values =
+        values
+        |> list.map(format_value)
+        |> string.join(", ")
+      "[" <> formatted_values <> "]"
+    }
+    parser.ObjectValue(fields) -> {
+      let formatted_fields =
+        fields
+        |> list.map(fn(field) {
+          let #(name, value) = field
+          name <> ": " <> format_value(value)
+        })
+        |> string.join(", ")
+      "{ " <> formatted_fields <> " }"
+    }
+  }
+}
+
+fn format_arguments(arguments: List(parser.Argument)) -> String {
+  case arguments {
+    [] -> ""
+    args -> {
+      let formatted_args =
+        args
+        |> list.map(fn(arg) {
+          let parser.Argument(name, value) = arg
+          name <> ": " <> format_value(value)
+        })
+        |> string.join(", ")
+      "(" <> formatted_args <> ")"
+    }
+  }
 }
 
 fn snake_case(s: String) -> String {

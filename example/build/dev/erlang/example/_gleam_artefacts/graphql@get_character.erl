@@ -101,11 +101,11 @@ get_character_response_decoder() ->
         )
     end.
 
--file("src/graphql/get_character.gleam", 73).
+-file("src/graphql/get_character.gleam", 70).
 -spec get_character(binary(), binary()) -> {ok, get_character_response()} |
     {error, binary()}.
 get_character(Endpoint, Id) ->
-    Query = <<"query GetCharacter($id: ID!) { character { id name status species type gender } }"/utf8>>,
+    Query = <<"query GetCharacter($id: ID!) { character(id: $id) { id name status species type gender } }"/utf8>>,
     Variables = gleam@json:object([{<<"id"/utf8>>, gleam@json:string(Id)}]),
     Body = gleam@json:object(
         [{<<"query"/utf8>>, gleam@json:string(Query)},

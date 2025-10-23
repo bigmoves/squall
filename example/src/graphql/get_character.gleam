@@ -19,9 +19,7 @@ pub type Character {
 
 pub fn character_decoder() -> dynamic.Decoder(Character) {
   fn(data: dynamic.Dynamic) -> Result(Character, List(dynamic.DecodeError)) {
-    use id <- result.try(dynamic.field("id", dynamic.optional(dynamic.string))(
-      data,
-    ))
+    use id <- result.try(dynamic.field("id", dynamic.optional(dynamic.string))(data))
     use name <- result.try(dynamic.field(
       "name",
       dynamic.optional(dynamic.string),
@@ -42,14 +40,16 @@ pub fn character_decoder() -> dynamic.Decoder(Character) {
       "gender",
       dynamic.optional(dynamic.string),
     )(data))
-    Ok(Character(
-      id: id,
-      name: name,
-      status: status,
-      species: species,
-      type_: type_,
-      gender: gender,
-    ))
+    Ok(
+      Character(
+        id: id,
+        name: name,
+        status: status,
+        species: species,
+        type_: type_,
+        gender: gender,
+      ),
+    )
   }
 }
 
@@ -58,10 +58,7 @@ pub type GetCharacterResponse {
 }
 
 pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse) {
-  fn(data: dynamic.Dynamic) -> Result(
-    GetCharacterResponse,
-    List(dynamic.DecodeError),
-  ) {
+  fn(data: dynamic.Dynamic) -> Result(GetCharacterResponse, List(dynamic.DecodeError)) {
     use character <- result.try(dynamic.field(
       "character",
       dynamic.optional(character_decoder()),
@@ -70,24 +67,23 @@ pub fn get_character_response_decoder() -> dynamic.Decoder(GetCharacterResponse)
   }
 }
 
-pub fn get_character(
-  endpoint: String,
-  id: String,
-) -> Result(GetCharacterResponse, String) {
+pub fn get_character(endpoint: String, id: String) -> Result(
+  GetCharacterResponse,
+  String,
+) {
   let query =
-    "query GetCharacter($id: ID!) { character { id name status species type gender } }"
+  "query GetCharacter($id: ID!) { character(id: $id) { id name status species type gender } }"
   let variables = json.object([#("id", json.string(id))])
   let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
+  json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req =
-    req
-    |> request.set_method(http.Post)
-    |> request.set_body(json.to_string(body))
-    |> request.set_header("content-type", "application/json")
+  let req = req
+  |> request.set_method(http.Post)
+  |> request.set_body(json.to_string(body))
+  |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

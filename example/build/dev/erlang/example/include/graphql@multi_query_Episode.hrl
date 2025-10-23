@@ -1,0 +1,1 @@
+-record(episode, {id :: gleam@option:option(binary())}).

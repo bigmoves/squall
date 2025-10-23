@@ -1,5 +1,5 @@
 {application, squall, [
-    {vsn, "1.0.0"},
+    {vsn, "0.1.0"},
     {applications, [argv,
                     filepath,
                     glam,

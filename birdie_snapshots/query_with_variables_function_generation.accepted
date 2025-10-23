@@ -40,7 +40,7 @@ pub fn get_user_response_decoder() -> dynamic.Decoder(GetUserResponse) {
 }
 
 pub fn get_user(endpoint: String, id: String) -> Result(GetUserResponse, String) {
-  let query = "query GetUser($id: ID!) { user { id name } }"
+  let query = "query GetUser($id: ID!) { user(id: $id) { id name } }"
   let variables = json.object([#("id", json.string(id))])
   let body =
   json.object([#("query", json.string(query)), #("variables", variables)])

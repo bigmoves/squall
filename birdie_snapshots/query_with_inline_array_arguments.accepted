@@ -1,0 +1,68 @@
+---
+version: 1.2.0
+title: Query with inline array arguments
+file: ./test/codegen_test.gleam
+test_name: generate_inline_array_arguments_test
+---
+import gleam/dynamic
+import gleam/http
+import gleam/http/request
+import gleam/httpc
+import gleam/json
+import gleam/option.{type Option}
+import gleam/result
+
+pub type Episode {
+  Episode(id: String, name: String)
+}
+
+pub fn episode_decoder() -> dynamic.Decoder(Episode) {
+  fn(data: dynamic.Dynamic) -> Result(Episode, List(dynamic.DecodeError)) {
+    use id <- result.try(dynamic.field("id", dynamic.string)(data))
+    use name <- result.try(dynamic.field("name", dynamic.string)(data))
+    Ok(Episode(id: id, name: name))
+  }
+}
+
+pub type GetEpisodesResponse {
+  GetEpisodesResponse(episodes_by_ids: Option(List(Episode)))
+}
+
+pub fn get_episodes_response_decoder() -> dynamic.Decoder(GetEpisodesResponse) {
+  fn(data: dynamic.Dynamic) -> Result(GetEpisodesResponse, List(dynamic.DecodeError)) {
+    use episodes_by_ids <- result.try(dynamic.field(
+      "episodesByIds",
+      dynamic.optional(dynamic.list(episode_decoder())),
+    )(data))
+    Ok(GetEpisodesResponse(episodes_by_ids: episodes_by_ids))
+  }
+}
+
+pub fn get_episodes(endpoint: String) -> Result(GetEpisodesResponse, String) {
+  let query = "query GetEpisodes { episodesByIds(ids: [1, 2, 3]) { id name } }"
+  let variables = json.object([])
+  let body =
+  json.object([#("query", json.string(query)), #("variables", variables)])
+  use req <- result.try(
+    request.to(endpoint)
+    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+  )
+  let req = req
+  |> request.set_method(http.Post)
+  |> request.set_body(json.to_string(body))
+  |> request.set_header("content-type", "application/json")
+  use resp <- result.try(
+    httpc.send(req)
+    |> result.map_error(fn(_) { "HTTP request failed" }),
+  )
+  use json_value <- result.try(
+    json.decode(from: resp.body, using: dynamic.dynamic)
+    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
+  )
+  use data_field <- result.try(
+    dynamic.field("data", dynamic.dynamic)(json_value)
+    |> result.map_error(fn(_) { "No data field in response" }),
+  )
+  get_episodes_response_decoder()(data_field)
+  |> result.map_error(fn(_) { "Failed to decode response data" })
+}

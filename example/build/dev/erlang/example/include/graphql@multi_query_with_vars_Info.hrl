@@ -1,0 +1,1 @@
+-record(info, {count :: gleam@option:option(integer())}).

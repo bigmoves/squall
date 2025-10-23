@@ -79,7 +79,7 @@ characters_decoder() ->
         )
     end.
 
--file("src/graphql/get_characters.gleam", 57).
+-file("src/graphql/get_characters.gleam", 55).
 -spec get_characters_response_decoder() -> fun((gleam@dynamic:dynamic_()) -> {ok,
         get_characters_response()} |
     {error, list(gleam@dynamic:decode_error())}).
@@ -94,7 +94,7 @@ get_characters_response_decoder() ->
         )
     end.
 
--file("src/graphql/get_characters.gleam", 72).
+-file("src/graphql/get_characters.gleam", 65).
 -spec get_characters(binary()) -> {ok, get_characters_response()} |
     {error, binary()}.
 get_characters(Endpoint) ->

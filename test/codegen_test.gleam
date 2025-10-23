@@ -349,3 +349,374 @@ pub fn generate_with_reserved_keywords_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate query with inline scalar arguments
+pub fn generate_inline_scalar_arguments_test() {
+  let query_source =
+    "
+    query GetCharacter {
+      character(id: 1) {
+        id
+        name
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "character",
+                schema.NamedType("Character", schema.Object),
+                [
+                  schema.InputValue(
+                    "id",
+                    schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_character", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with inline scalar arguments")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate query with inline object arguments
+pub fn generate_inline_object_arguments_test() {
+  let query_source =
+    "
+    query GetCharacters {
+      characters(filter: { name: \"rick\", status: \"alive\" }) {
+        results {
+          id
+          name
+        }
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let characters_result_fields = [
+    schema.Field(
+      "results",
+      schema.ListType(schema.NamedType("Character", schema.Object)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharactersResult",
+          schema.ObjectType("CharactersResult", characters_result_fields, None),
+        ),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "characters",
+                schema.NamedType("CharactersResult", schema.Object),
+                [
+                  schema.InputValue(
+                    "filter",
+                    schema.NamedType("FilterInput", schema.InputObject),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_characters", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with inline object arguments")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate query with inline array arguments
+pub fn generate_inline_array_arguments_test() {
+  let query_source =
+    "
+    query GetEpisodes {
+      episodesByIds(ids: [1, 2, 3]) {
+        id
+        name
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  let episode_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Episode", schema.ObjectType("Episode", episode_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "episodesByIds",
+                schema.ListType(schema.NamedType("Episode", schema.Object)),
+                [
+                  schema.InputValue(
+                    "ids",
+                    schema.ListType(schema.NonNullType(schema.NamedType(
+                      "Int",
+                      schema.Scalar,
+                    ))),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_episodes", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with inline array arguments")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate query with multiple root fields and mixed argument types
+pub fn generate_multiple_root_fields_test() {
+  let query_source =
+    "
+    query MultiQuery {
+      characters(page: 2, filter: { name: \"rick\" }) {
+        info {
+          count
+        }
+        results {
+          name
+        }
+      }
+      location(id: 1) {
+        id
+      }
+      episodesByIds(ids: [1, 2]) {
+        id
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  let character_fields = [
+    schema.Field("name", schema.NamedType("String", schema.Scalar), [], None),
+  ]
+
+  let info_fields = [
+    schema.Field("count", schema.NamedType("Int", schema.Scalar), [], None),
+  ]
+
+  let characters_result_fields = [
+    schema.Field(
+      "info",
+      schema.NamedType("Info", schema.Object),
+      [],
+      None,
+    ),
+    schema.Field(
+      "results",
+      schema.ListType(schema.NamedType("Character", schema.Object)),
+      [],
+      None,
+    ),
+  ]
+
+  let location_fields = [
+    schema.Field("id", schema.NamedType("ID", schema.Scalar), [], None),
+  ]
+
+  let episode_fields = [
+    schema.Field("id", schema.NamedType("ID", schema.Scalar), [], None),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #("Info", schema.ObjectType("Info", info_fields, None)),
+        #(
+          "CharactersResult",
+          schema.ObjectType("CharactersResult", characters_result_fields, None),
+        ),
+        #("Location", schema.ObjectType("Location", location_fields, None)),
+        #("Episode", schema.ObjectType("Episode", episode_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "characters",
+                schema.NamedType("CharactersResult", schema.Object),
+                [
+                  schema.InputValue(
+                    "page",
+                    schema.NamedType("Int", schema.Scalar),
+                    None,
+                  ),
+                  schema.InputValue(
+                    "filter",
+                    schema.NamedType("FilterInput", schema.InputObject),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+              schema.Field(
+                "location",
+                schema.NamedType("Location", schema.Object),
+                [
+                  schema.InputValue(
+                    "id",
+                    schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+              schema.Field(
+                "episodesByIds",
+                schema.ListType(schema.NamedType("Episode", schema.Object)),
+                [
+                  schema.InputValue(
+                    "ids",
+                    schema.ListType(schema.NonNullType(schema.NamedType(
+                      "Int",
+                      schema.Scalar,
+                    ))),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("multi_query", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with multiple root fields and mixed arguments")
+    }
+    Error(_) -> Nil
+  }
+}

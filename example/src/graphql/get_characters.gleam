@@ -31,9 +31,7 @@ pub type Character {
 
 pub fn character_decoder() -> dynamic.Decoder(Character) {
   fn(data: dynamic.Dynamic) -> Result(Character, List(dynamic.DecodeError)) {
-    use id <- result.try(dynamic.field("id", dynamic.optional(dynamic.string))(
-      data,
-    ))
+    use id <- result.try(dynamic.field("id", dynamic.optional(dynamic.string))(data))
     use name <- result.try(dynamic.field(
       "name",
       dynamic.optional(dynamic.string),
@@ -54,13 +52,8 @@ pub type GetCharactersResponse {
   GetCharactersResponse(characters: Option(Characters))
 }
 
-pub fn get_characters_response_decoder() -> dynamic.Decoder(
-  GetCharactersResponse,
-) {
-  fn(data: dynamic.Dynamic) -> Result(
-    GetCharactersResponse,
-    List(dynamic.DecodeError),
-  ) {
+pub fn get_characters_response_decoder() -> dynamic.Decoder(GetCharactersResponse) {
+  fn(data: dynamic.Dynamic) -> Result(GetCharactersResponse, List(dynamic.DecodeError)) {
     use characters <- result.try(dynamic.field(
       "characters",
       dynamic.optional(characters_decoder()),
@@ -71,19 +64,18 @@ pub fn get_characters_response_decoder() -> dynamic.Decoder(
 
 pub fn get_characters(endpoint: String) -> Result(GetCharactersResponse, String) {
   let query =
-    "query GetCharacters { characters { results { id name status species } } }"
+  "query GetCharacters { characters { results { id name status species } } }"
   let variables = json.object([])
   let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
+  json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
     request.to(endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
-  let req =
-    req
-    |> request.set_method(http.Post)
-    |> request.set_body(json.to_string(body))
-    |> request.set_header("content-type", "application/json")
+  let req = req
+  |> request.set_method(http.Post)
+  |> request.set_body(json.to_string(body))
+  |> request.set_header("content-type", "application/json")
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

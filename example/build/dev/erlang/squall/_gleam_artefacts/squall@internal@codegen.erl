@@ -24,7 +24,7 @@
         list({binary(), squall@internal@schema:type_ref()}),
         gleam@dict:dict(binary(), squall@internal@schema:type())}.
 
--file("src/squall/internal/codegen.gleam", 83).
+-file("src/squall/internal/codegen.gleam", 85).
 ?DOC(false).
 -spec let_var(binary(), glam@doc:document()) -> glam@doc:document().
 let_var(Name, Body) ->
@@ -36,7 +36,7 @@ let_var(Name, Body) ->
     _pipe@1 = glam@doc:concat(_pipe),
     glam@doc:group(_pipe@1).
 
--file("src/squall/internal/codegen.gleam", 90).
+-file("src/squall/internal/codegen.gleam", 92).
 ?DOC(false).
 -spec string_doc(binary()) -> glam@doc:document().
 string_doc(Content) ->
@@ -52,7 +52,7 @@ string_doc(Content) ->
         glam@doc:from_string(<<"\""/utf8>>)],
     glam@doc:concat(_pipe@4).
 
--file("src/squall/internal/codegen.gleam", 111).
+-file("src/squall/internal/codegen.gleam", 114).
 ?DOC(false).
 -spec imports_doc() -> glam@doc:document().
 imports_doc() ->
@@ -67,7 +67,7 @@ imports_doc() ->
     _pipe@1 = gleam@list:map(_pipe, fun glam@doc:from_string/1),
     glam@doc:join(_pipe@1, {line, 1}).
 
--file("src/squall/internal/codegen.gleam", 221).
+-file("src/squall/internal/codegen.gleam", 224).
 ?DOC(false).
 -spec collect_field_types(
     list(squall@internal@parser:selection()),
@@ -104,7 +104,7 @@ collect_field_types(Selections, Parent_type) ->
                     )
             end end).
 
--file("src/squall/internal/codegen.gleam", 313).
+-file("src/squall/internal/codegen.gleam", 316).
 ?DOC(false).
 -spec get_base_type_name(squall@internal@schema:type_ref()) -> binary().
 get_base_type_name(Type_ref) ->
@@ -119,7 +119,7 @@ get_base_type_name(Type_ref) ->
             get_base_type_name(Inner@1)
     end.
 
--file("src/squall/internal/codegen.gleam", 249).
+-file("src/squall/internal/codegen.gleam", 252).
 ?DOC(false).
 -spec collect_nested_types(
     list(squall@internal@parser:selection()),
@@ -207,7 +207,7 @@ collect_nested_types(Selections, Parent_type, Schema_data) ->
             end end),
     gleam@result:map(_pipe@4, fun gleam@list:flatten/1).
 
--file("src/squall/internal/codegen.gleam", 480).
+-file("src/squall/internal/codegen.gleam", 483).
 ?DOC(false).
 -spec generate_field_decoder(squall@internal@type_mapping:gleam_type()) -> binary().
 generate_field_decoder(Gleam_type) ->
@@ -237,28 +237,7 @@ generate_field_decoder(Gleam_type) ->
             <<"dynamic.dynamic"/utf8>>
     end.
 
--file("src/squall/internal/codegen.gleam", 718).
-?DOC(false).
--spec build_selection_set(list(squall@internal@parser:selection())) -> binary().
-build_selection_set(Selections) ->
-    Fields = begin
-        _pipe = Selections,
-        _pipe@1 = gleam@list:map(_pipe, fun(Selection) -> case Selection of
-                    {field_selection, Name, _, _, Nested} ->
-                        case Nested of
-                            [] ->
-                                Name;
-
-                            Subs ->
-                                <<<<Name/binary, " "/utf8>>/binary,
-                                    (build_selection_set(Subs))/binary>>
-                        end
-                end end),
-        gleam@string:join(_pipe@1, <<" "/utf8>>)
-    end,
-    <<<<"{ "/utf8, Fields/binary>>/binary, " }"/utf8>>.
-
--file("src/squall/internal/codegen.gleam", 736).
+-file("src/squall/internal/codegen.gleam", 750).
 ?DOC(false).
 -spec type_ref_to_string(squall@internal@parser:type_ref()) -> binary().
 type_ref_to_string(Type_ref) ->
@@ -274,7 +253,125 @@ type_ref_to_string(Type_ref) ->
             <<(type_ref_to_string(Inner@1))/binary, "!"/utf8>>
     end.
 
--file("src/squall/internal/codegen.gleam", 686).
+-file("src/squall/internal/codegen.gleam", 760).
+?DOC(false).
+-spec capitalize(binary()) -> binary().
+capitalize(S) ->
+    case gleam@string:pop_grapheme(S) of
+        {ok, {First, Rest}} ->
+            <<(gleam@string:uppercase(First))/binary, Rest/binary>>;
+
+        {error, _} ->
+            S
+    end.
+
+-file("src/squall/internal/codegen.gleam", 767).
+?DOC(false).
+-spec to_pascal_case(binary()) -> binary().
+to_pascal_case(S) ->
+    _pipe = S,
+    _pipe@1 = gleam@string:split(_pipe, <<"_"/utf8>>),
+    _pipe@2 = gleam@list:map(_pipe@1, fun capitalize/1),
+    gleam@string:join(_pipe@2, <<""/utf8>>).
+
+-file("src/squall/internal/codegen.gleam", 774).
+?DOC(false).
+-spec format_value(squall@internal@parser:value()) -> binary().
+format_value(Value) ->
+    case Value of
+        {int_value, I} ->
+            gleam@int:to_string(I);
+
+        {float_value, F} ->
+            gleam@float:to_string(F);
+
+        {string_value, S} ->
+            <<<<"\""/utf8, S/binary>>/binary, "\""/utf8>>;
+
+        {boolean_value, true} ->
+            <<"true"/utf8>>;
+
+        {boolean_value, false} ->
+            <<"false"/utf8>>;
+
+        null_value ->
+            <<"null"/utf8>>;
+
+        {variable_value, Name} ->
+            <<"$"/utf8, Name/binary>>;
+
+        {list_value, Values} ->
+            Formatted_values = begin
+                _pipe = Values,
+                _pipe@1 = gleam@list:map(_pipe, fun format_value/1),
+                gleam@string:join(_pipe@1, <<", "/utf8>>)
+            end,
+            <<<<"["/utf8, Formatted_values/binary>>/binary, "]"/utf8>>;
+
+        {object_value, Fields} ->
+            Formatted_fields = begin
+                _pipe@2 = Fields,
+                _pipe@3 = gleam@list:map(
+                    _pipe@2,
+                    fun(Field) ->
+                        {Name@1, Value@1} = Field,
+                        <<<<Name@1/binary, ": "/utf8>>/binary,
+                            (format_value(Value@1))/binary>>
+                    end
+                ),
+                gleam@string:join(_pipe@3, <<", "/utf8>>)
+            end,
+            <<<<"{ "/utf8, Formatted_fields/binary>>/binary, " }"/utf8>>
+    end.
+
+-file("src/squall/internal/codegen.gleam", 803).
+?DOC(false).
+-spec format_arguments(list(squall@internal@parser:argument())) -> binary().
+format_arguments(Arguments) ->
+    case Arguments of
+        [] ->
+            <<""/utf8>>;
+
+        Args ->
+            Formatted_args = begin
+                _pipe = Args,
+                _pipe@1 = gleam@list:map(
+                    _pipe,
+                    fun(Arg) ->
+                        {argument, Name, Value} = Arg,
+                        <<<<Name/binary, ": "/utf8>>/binary,
+                            (format_value(Value))/binary>>
+                    end
+                ),
+                gleam@string:join(_pipe@1, <<", "/utf8>>)
+            end,
+            <<<<"("/utf8, Formatted_args/binary>>/binary, ")"/utf8>>
+    end.
+
+-file("src/squall/internal/codegen.gleam", 731).
+?DOC(false).
+-spec build_selection_set(list(squall@internal@parser:selection())) -> binary().
+build_selection_set(Selections) ->
+    Fields = begin
+        _pipe = Selections,
+        _pipe@1 = gleam@list:map(_pipe, fun(Selection) -> case Selection of
+                    {field_selection, Name, _, Args, Nested} ->
+                        Args_str = format_arguments(Args),
+                        case Nested of
+                            [] ->
+                                <<Name/binary, Args_str/binary>>;
+
+                            Subs ->
+                                <<<<<<Name/binary, Args_str/binary>>/binary,
+                                        " "/utf8>>/binary,
+                                    (build_selection_set(Subs))/binary>>
+                        end
+                end end),
+        gleam@string:join(_pipe@1, <<" "/utf8>>)
+    end,
+    <<<<"{ "/utf8, Fields/binary>>/binary, " }"/utf8>>.
+
+-file("src/squall/internal/codegen.gleam", 699).
 ?DOC(false).
 -spec build_query_string(squall@internal@parser:operation()) -> binary().
 build_query_string(Operation) ->
@@ -321,28 +418,7 @@ build_query_string(Operation) ->
             " "/utf8>>/binary,
         Selection_set/binary>>.
 
--file("src/squall/internal/codegen.gleam", 746).
-?DOC(false).
--spec capitalize(binary()) -> binary().
-capitalize(S) ->
-    case gleam@string:pop_grapheme(S) of
-        {ok, {First, Rest}} ->
-            <<(gleam@string:uppercase(First))/binary, Rest/binary>>;
-
-        {error, _} ->
-            S
-    end.
-
--file("src/squall/internal/codegen.gleam", 753).
-?DOC(false).
--spec to_pascal_case(binary()) -> binary().
-to_pascal_case(S) ->
-    _pipe = S,
-    _pipe@1 = gleam@string:split(_pipe, <<"_"/utf8>>),
-    _pipe@2 = gleam@list:map(_pipe@1, fun capitalize/1),
-    gleam@string:join(_pipe@2, <<""/utf8>>).
-
--file("src/squall/internal/codegen.gleam", 760).
+-file("src/squall/internal/codegen.gleam", 819).
 ?DOC(false).
 -spec snake_case(binary()) -> binary().
 snake_case(S) ->
@@ -371,7 +447,7 @@ snake_case(S) ->
         end
     ).
 
--file("src/squall/internal/codegen.gleam", 451).
+-file("src/squall/internal/codegen.gleam", 454).
 ?DOC(false).
 -spec generate_field_decoder_with_schema_inner(
     squall@internal@type_mapping:gleam_type(),
@@ -411,7 +487,7 @@ generate_field_decoder_with_schema_inner(Gleam_type, Type_ref, Schema_types) ->
             generate_field_decoder(Gleam_type)
     end.
 
--file("src/squall/internal/codegen.gleam", 419).
+-file("src/squall/internal/codegen.gleam", 422).
 ?DOC(false).
 -spec generate_field_decoder_with_schema(
     squall@internal@type_mapping:gleam_type(),
@@ -459,7 +535,7 @@ generate_field_decoder_with_schema(Gleam_type, Type_ref, Schema_types) ->
             end
     end.
 
--file("src/squall/internal/codegen.gleam", 49).
+-file("src/squall/internal/codegen.gleam", 51).
 ?DOC(false).
 -spec comma_list(binary(), list(glam@doc:document()), binary()) -> glam@doc:document().
 comma_list(Open, Content, Close) ->
@@ -483,7 +559,7 @@ comma_list(Open, Content, Close) ->
             glam@doc:concat(_pipe@2)
     end.
 
--file("src/squall/internal/codegen.gleam", 42).
+-file("src/squall/internal/codegen.gleam", 44).
 ?DOC(false).
 -spec call_doc(binary(), list(glam@doc:document())) -> glam@doc:document().
 call_doc(Function, Args) ->
@@ -495,7 +571,7 @@ call_doc(Function, Args) ->
     _pipe@2 = glam@doc:concat(_pipe@1),
     glam@doc:group(_pipe@2).
 
--file("src/squall/internal/codegen.gleam", 69).
+-file("src/squall/internal/codegen.gleam", 71).
 ?DOC(false).
 -spec block(list(glam@doc:document())) -> glam@doc:document().
 block(Body) ->
@@ -513,7 +589,7 @@ block(Body) ->
         glam@doc:from_string(<<"}"/utf8>>)],
     glam@doc:concat(_pipe@3).
 
--file("src/squall/internal/codegen.gleam", 660).
+-file("src/squall/internal/codegen.gleam", 665).
 ?DOC(false).
 -spec encode_variable_value(binary(), squall@internal@type_mapping:gleam_type()) -> glam@doc:document().
 encode_variable_value(Var_name, Gleam_type) ->
@@ -530,25 +606,41 @@ encode_variable_value(Var_name, Gleam_type) ->
         bool_type ->
             call_doc(<<"json.bool"/utf8>>, [glam@doc:from_string(Var_name)]);
 
-        {list_type, _} ->
+        {list_type, Inner} ->
+            Encoder = case Inner of
+                string_type ->
+                    <<"json.string"/utf8>>;
+
+                int_type ->
+                    <<"json.int"/utf8>>;
+
+                float_type ->
+                    <<"json.float"/utf8>>;
+
+                bool_type ->
+                    <<"json.bool"/utf8>>;
+
+                _ ->
+                    <<"json.string"/utf8>>
+            end,
             call_doc(
                 <<"json.array"/utf8>>,
                 [glam@doc:from_string(<<"from: "/utf8, Var_name/binary>>),
-                    glam@doc:from_string(<<"of: json.string"/utf8>>)]
+                    glam@doc:from_string(<<"of: "/utf8, Encoder/binary>>)]
             );
 
-        {option_type, Inner} ->
+        {option_type, Inner@1} ->
             call_doc(
                 <<"json.nullable"/utf8>>,
                 [glam@doc:from_string(Var_name),
-                    encode_variable_value(<<"value"/utf8>>, Inner)]
+                    encode_variable_value(<<"value"/utf8>>, Inner@1)]
             );
 
         {custom_type, _} ->
             call_doc(<<"json.string"/utf8>>, [glam@doc:from_string(Var_name)])
     end.
 
--file("src/squall/internal/codegen.gleam", 495).
+-file("src/squall/internal/codegen.gleam", 498).
 ?DOC(false).
 -spec generate_function(
     binary(),
@@ -579,10 +671,10 @@ generate_function(Operation_name, Response_type_name, Variables, Query_string) -
                                 )
                             end,
                             fun(Gleam_type) ->
+                                Param_name = snake_case(erlang:element(2, Var)),
                                 {ok,
                                     glam@doc:from_string(
-                                        <<<<(erlang:element(2, Var))/binary,
-                                                ": "/utf8>>/binary,
+                                        <<<<Param_name/binary, ": "/utf8>>/binary,
                                             (squall@internal@type_mapping:to_gleam_type_string(
                                                 Gleam_type
                                             ))/binary>>
@@ -619,8 +711,11 @@ generate_function(Operation_name, Response_type_name, Variables, Query_string) -
                                 )
                             end,
                             fun(Gleam_type@1) ->
+                                Param_name@1 = snake_case(
+                                    erlang:element(2, Var@1)
+                                ),
                                 Value_encoder = encode_variable_value(
-                                    erlang:element(2, Var@1),
+                                    Param_name@1,
                                     Gleam_type@1
                                 ),
                                 {ok,
@@ -787,10 +882,11 @@ generate_function(Operation_name, Response_type_name, Variables, Query_string) -
             block(Body_docs)]
     ).
 
--file("src/squall/internal/codegen.gleam", 103).
+-file("src/squall/internal/codegen.gleam", 105).
 ?DOC(false).
 -spec sanitize_field_name(binary()) -> binary().
 sanitize_field_name(Name) ->
+    Snake_cased = snake_case(Name),
     case gleam@list:contains(
         [<<"as"/utf8>>,
             <<"assert"/utf8>>,
@@ -807,16 +903,16 @@ sanitize_field_name(Name) ->
             <<"try"/utf8>>,
             <<"type"/utf8>>,
             <<"use"/utf8>>],
-        Name
+        Snake_cased
     ) of
         true ->
-            <<Name/binary, "_"/utf8>>;
+            <<Snake_cased/binary, "_"/utf8>>;
 
         false ->
-            Name
+            Snake_cased
     end.
 
--file("src/squall/internal/codegen.gleam", 322).
+-file("src/squall/internal/codegen.gleam", 325).
 ?DOC(false).
 -spec generate_type_definition(
     binary(),
@@ -865,7 +961,7 @@ generate_type_definition(Type_name, Fields) ->
     _pipe@5 = glam@doc:concat(_pipe@4),
     glam@doc:group(_pipe@5).
 
--file("src/squall/internal/codegen.gleam", 359).
+-file("src/squall/internal/codegen.gleam", 362).
 ?DOC(false).
 -spec generate_decoder_with_schema(
     binary(),
@@ -945,7 +1041,7 @@ generate_decoder_with_schema(Type_name, Fields, Schema_types) ->
             block([Inner_fn])]
     ).
 
--file("src/squall/internal/codegen.gleam", 130).
+-file("src/squall/internal/codegen.gleam", 133).
 ?DOC(false).
 -spec generate_operation(
     binary(),
