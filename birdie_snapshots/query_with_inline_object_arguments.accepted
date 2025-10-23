@@ -1,16 +1,16 @@
 ---
 version: 1.2.0
 title: Query with inline object arguments
-file: ./test/codegen_test.gleam
-test_name: generate_inline_object_arguments_test
 ---
 import gleam/dynamic
 import gleam/http
 import gleam/http/request
 import gleam/httpc
 import gleam/json
+import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import squall
 
 pub type CharactersResult {
   CharactersResult(results: Option(List(Character)))
@@ -58,7 +58,7 @@ pub fn get_characters_response_decoder() -> dynamic.Decoder(GetCharactersRespons
   }
 }
 
-pub fn get_characters(endpoint: String) -> Result(GetCharactersResponse, String) {
+pub fn get_characters(client: squall.Client) -> Result(GetCharactersResponse, String) {
   let query =
     "query GetCharacters { characters(filter: { name: \"rick\", status: \"alive\" }) { results { id name } } }"
   let variables =
@@ -66,7 +66,7 @@ pub fn get_characters(endpoint: String) -> Result(GetCharactersResponse, String)
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
-    request.to(endpoint)
+    request.to(client.endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
   let req =
@@ -74,6 +74,10 @@ pub fn get_characters(endpoint: String) -> Result(GetCharactersResponse, String)
     |> request.set_method(http.Post)
     |> request.set_body(json.to_string(body))
     |> request.set_header("content-type", "application/json")
+  let req =
+    list.fold(client.headers, req, fn(r, header) {
+      request.set_header(r, header.0, header.1)
+    })
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

@@ -119,8 +119,10 @@ fn imports_doc() -> Document {
     "import gleam/http/request",
     "import gleam/httpc",
     "import gleam/json",
+    "import gleam/list",
     "import gleam/option.{type Option}",
     "import gleam/result",
+    "import squall",
   ]
 
   import_lines
@@ -517,7 +519,7 @@ fn generate_function(
 
   // Build parameter list as documents
   let param_docs = case variables {
-    [] -> [doc.from_string("endpoint: String")]
+    [] -> [doc.from_string("client: squall.Client")]
     vars -> {
       let var_param_docs =
         vars
@@ -535,7 +537,7 @@ fn generate_function(
         })
         |> list.filter_map(fn(r) { r })
 
-      [doc.from_string("endpoint: String"), ..var_param_docs]
+      [doc.from_string("client: squall.Client"), ..var_param_docs]
     }
   }
 
@@ -585,7 +587,7 @@ fn generate_function(
       doc.from_string("use req <- result.try("),
       doc.concat([
         doc.line,
-        call_doc("request.to", [doc.from_string("endpoint")]),
+        call_doc("request.to", [doc.from_string("client.endpoint")]),
         doc.line,
         doc.from_string("|> result.map_error(fn(_) { \"Invalid endpoint URL\" }),"),
       ])
@@ -603,6 +605,16 @@ fn generate_function(
         doc.from_string("|> request.set_body(json.to_string(body))"),
         doc.line,
         doc.from_string("|> request.set_header(\"content-type\", \"application/json\")"),
+      ]),
+    ),
+    let_var(
+      "req",
+      doc.concat([
+        doc.from_string("list.fold(client.headers, req, fn(r, header) {"),
+        doc.line,
+        doc.from_string("  request.set_header(r, header.0, header.1)"),
+        doc.line,
+        doc.from_string("})"),
       ]),
     ),
     doc.concat([

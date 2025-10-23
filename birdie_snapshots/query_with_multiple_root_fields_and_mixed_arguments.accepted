@@ -1,16 +1,16 @@
 ---
 version: 1.2.0
 title: Query with multiple root fields and mixed arguments
-file: ./test/codegen_test.gleam
-test_name: generate_multiple_root_fields_test
 ---
 import gleam/dynamic
 import gleam/http
 import gleam/http/request
 import gleam/httpc
 import gleam/json
+import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import squall
 
 pub type CharactersResult {
   CharactersResult(info: Option(Info), results: Option(List(Character)))
@@ -116,7 +116,7 @@ pub fn multi_query_response_decoder() -> dynamic.Decoder(MultiQueryResponse) {
   }
 }
 
-pub fn multi_query(endpoint: String) -> Result(MultiQueryResponse, String) {
+pub fn multi_query(client: squall.Client) -> Result(MultiQueryResponse, String) {
   let query =
     "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }"
   let variables =
@@ -124,7 +124,7 @@ pub fn multi_query(endpoint: String) -> Result(MultiQueryResponse, String) {
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
-    request.to(endpoint)
+    request.to(client.endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
   let req =
@@ -132,6 +132,10 @@ pub fn multi_query(endpoint: String) -> Result(MultiQueryResponse, String) {
     |> request.set_method(http.Post)
     |> request.set_body(json.to_string(body))
     |> request.set_header("content-type", "application/json")
+  let req =
+    list.fold(client.headers, req, fn(r, header) {
+      request.set_header(r, header.0, header.1)
+    })
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

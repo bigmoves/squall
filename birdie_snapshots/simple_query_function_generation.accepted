@@ -1,16 +1,16 @@
 ---
 version: 1.2.0
 title: Simple query function generation
-file: ./test/codegen_test.gleam
-test_name: generate_simple_query_test
 ---
 import gleam/dynamic
 import gleam/http
 import gleam/http/request
 import gleam/httpc
 import gleam/json
+import gleam/list
 import gleam/option.{type Option}
 import gleam/result
+import squall
 
 pub type User {
   User(id: String, name: Option(String))
@@ -44,7 +44,7 @@ pub fn get_user_response_decoder() -> dynamic.Decoder(GetUserResponse) {
   }
 }
 
-pub fn get_user(endpoint: String) -> Result(GetUserResponse, String) {
+pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {
   let query =
     "query GetUser { user { id name } }"
   let variables =
@@ -52,7 +52,7 @@ pub fn get_user(endpoint: String) -> Result(GetUserResponse, String) {
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
-    request.to(endpoint)
+    request.to(client.endpoint)
     |> result.map_error(fn(_) { "Invalid endpoint URL" }),
   )
   let req =
@@ -60,6 +60,10 @@ pub fn get_user(endpoint: String) -> Result(GetUserResponse, String) {
     |> request.set_method(http.Post)
     |> request.set_body(json.to_string(body))
     |> request.set_header("content-type", "application/json")
+  let req =
+    list.fold(client.headers, req, fn(r, header) {
+      request.set_header(r, header.0, header.1)
+    })
   use resp <- result.try(
     httpc.send(req)
     |> result.map_error(fn(_) { "HTTP request failed" }),

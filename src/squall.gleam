@@ -14,6 +14,21 @@ import squall/internal/error
 import squall/internal/parser
 import squall/internal/schema
 
+/// A GraphQL client with endpoint and headers configuration
+pub type Client {
+  Client(endpoint: String, headers: List(#(String, String)))
+}
+
+/// Create a new GraphQL client with custom headers
+pub fn new_client(endpoint: String, headers: List(#(String, String))) -> Client {
+  Client(endpoint: endpoint, headers: headers)
+}
+
+/// Create a new GraphQL client with bearer token authentication
+pub fn new_client_with_auth(endpoint: String, token: String) -> Client {
+  Client(endpoint: endpoint, headers: [#("Authorization", "Bearer " <> token)])
+}
+
 pub fn main() {
   case argv.load().arguments {
     ["generate", endpoint] -> generate(endpoint)

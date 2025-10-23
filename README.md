@@ -4,15 +4,16 @@ A type-safe GraphQL client generator for Gleam, inspired by [squirrel](https://g
 
 Squall parses `.gql` files in your project, introspects your GraphQL endpoint, and generates fully type-safe Gleam code with decoders, eliminating runtime errors and keeping your GraphQL queries in sync with your schema.
 
+> **⚠️ Warning**: This project is in early development and may contain bugs. Use at your own risk.
+
 ## Features
 
-- ✅ **Type-Safe**: Generated code is fully typed based on your GraphQL schema
-- ✅ **Convention-based**: Drop `.gql` files in `src/**/graphql/` directories
-- ✅ **Zero Configuration**: No config files needed
-- ✅ **Schema Introspection**: Automatically fetches types from your GraphQL endpoint
-- ✅ **Full GraphQL Support**: Queries, Mutations, and Subscriptions
-- ✅ **Test-Driven**: Built with TDD, 38+ passing tests
-- ✅ **Gleam-First**: Generates idiomatic Gleam code
+- Type-safe code generation from GraphQL schema
+- Convention over configuration - `.gql` files in `src/**/graphql/` directories
+- Schema introspection from GraphQL endpoints
+- Supports queries, mutations, and subscriptions
+- Client abstraction with authentication and custom headers
+- Multiple endpoint support
 
 ## Installation
 
@@ -20,7 +21,7 @@ Add squall to your `gleam.toml`:
 
 ```toml
 [dependencies]
-squall = "1.0.0"
+squall = "0.1.0"
 ```
 
 ## Quick Start
@@ -49,20 +50,55 @@ gleam run -m squall generate https://rickandmortyapi.com/graphql
 ### 3. Use the generated code
 
 ```gleam
+import squall
 import my_app/graphql/get_character
 
 pub fn main() {
-  let endpoint = "https://rickandmortyapi.com/graphql"
+  // Create a client
+  let client = squall.new_client(
+    endpoint: "https://rickandmortyapi.com/graphql",
+    headers: []
+  )
 
-  case get_character.get_character(endpoint, "1") {
+  // Use the generated function
+  case get_character.get_character(client: client, id: "1") {
     Ok(response) -> {
-      io.println("Character: " <> response.name)
+      io.println("Character: " <> response.character.name)
     }
     Error(err) -> {
       io.println("Error: " <> err)
     }
   }
 }
+```
+
+## Creating a Client
+
+Squall uses a client abstraction to manage your GraphQL endpoint and headers (including authentication):
+
+```gleam
+import squall
+
+// Create a client with custom headers
+let client = squall.new_client(
+  endpoint: "https://api.example.com/graphql",
+  headers: [
+    #("Authorization", "Bearer your-api-token-here"),
+    #("X-Custom-Header", "value")
+  ]
+)
+
+// Or use the convenience function for bearer token auth
+let client = squall.new_client_with_auth(
+  endpoint: "https://api.example.com/graphql",
+  token: "your-api-token-here"
+)
+
+// For public APIs with no authentication
+let client = squall.new_client(
+  endpoint: "https://rickandmortyapi.com/graphql",
+  headers: []
+)
 ```
 
 ## How It Works
@@ -116,7 +152,7 @@ pub type GetUserResponse {
 }
 
 pub fn get_user(
-  endpoint: String,
+  client: squall.Client,
   id: String,
 ) -> Result(GetUserResponse, String) {
   // HTTP request + JSON decoding implementation
@@ -161,19 +197,6 @@ Squall is built with a modular architecture:
 - **`codegen`**: Generates Gleam code
 - **`error`**: Comprehensive error handling
 
-## Comparison with Squirrel
-
-Squall is inspired by [squirrel](https://github.com/giacomocavalieri/squirrel) but for GraphQL instead of SQL:
-
-| Feature | Squirrel (SQL) | Squall (GraphQL) |
-|---------|----------------|------------------|
-| Query Language | SQL | GraphQL |
-| Type Source | PostgreSQL | GraphQL Schema |
-| File Pattern | `sql/*.sql` | `graphql/*.gql` |
-| Type Safety | ✅ | ✅ |
-| Zero Config | ✅ | ✅ |
-| Convention-based | ✅ | ✅ |
-
 ## Development
 
 ### Running Tests
@@ -212,11 +235,11 @@ squall/
 - [x] Subscription support
 - [x] Type-safe code generation
 - [x] Schema introspection
-- [ ] HTTP client implementation
+- [x] Client abstraction with headers/authentication
+- [x] Multiple endpoint support
 - [ ] Fragment support
 - [ ] Directive handling
 - [ ] Custom scalar mapping
-- [ ] Multiple endpoint support
 
 ## Contributing
 
@@ -230,13 +253,3 @@ Contributions are welcome! Please:
 ## License
 
 Apache-2.0
-
-## Acknowledgments
-
-- Inspired by [squirrel](https://github.com/giacomocavalieri/squirrel) by Giacomo Cavalieri
-- Built with [Gleam](https://gleam.run/)
-- Tested with the [Rick and Morty API](https://rickandmortyapi.com/graphql)
-
----
-
-Made with 🌊 and Gleam
