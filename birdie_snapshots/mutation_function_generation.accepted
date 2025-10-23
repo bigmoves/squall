@@ -1,8 +1,8 @@
 ---
-version: 1.2.0
+version: 1.4.1
 title: Mutation function generation
 ---
-import gleam/dynamic
+import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request
 import gleam/httpc
@@ -16,29 +16,19 @@ pub type User {
   User(id: String, name: String)
 }
 
-pub fn user_decoder() -> dynamic.Decoder(User) {
-  fn(data: dynamic.Dynamic) -> Result(User, List(dynamic.DecodeError)) {
-    use id <- result.try(dynamic.field("id", dynamic.string)(data))
-    use name <- result.try(dynamic.field("name", dynamic.string)(data))
-    Ok(User(id: id, name: name))
-  }
+pub fn user_decoder() -> decode.Decoder(User) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  decode.success(User(id: id, name: name))
 }
 
 pub type CreateUserResponse {
   CreateUserResponse(create_user: Option(User))
 }
 
-pub fn create_user_response_decoder() -> dynamic.Decoder(CreateUserResponse) {
-  fn(data: dynamic.Dynamic) -> Result(
-    CreateUserResponse,
-    List(dynamic.DecodeError),
-  ) {
-    use create_user <- result.try(dynamic.field(
-      "createUser",
-      dynamic.optional(user_decoder()),
-    )(data))
-    Ok(CreateUserResponse(create_user: create_user))
-  }
+pub fn create_user_response_decoder() -> decode.Decoder(CreateUserResponse) {
+  use create_user <- decode.field("createUser", decode.optional(user_decoder()))
+  decode.success(CreateUserResponse(create_user: create_user))
 }
 
 pub fn create_user(client: squall.Client, name: String) -> Result(CreateUserResponse, String) {
@@ -66,13 +56,14 @@ pub fn create_user(client: squall.Client, name: String) -> Result(CreateUserResp
     |> result.map_error(fn(_) { "HTTP request failed" }),
   )
   use json_value <- result.try(
-    json.decode(from: resp.body, using: dynamic.dynamic)
+    json.parse(from: resp.body, using: decode.dynamic)
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
-  use data_field <- result.try(
-    dynamic.field("data", dynamic.dynamic)(json_value)
-    |> result.map_error(fn(_) { "No data field in response" }),
-  )
-  create_user_response_decoder()(data_field)
+  let data_and_response_decoder = {
+    use data <- decode.field("data", create_user_response_decoder())
+    decode.success(data)
+  }
+  decode.run(json_value, data_and_response_decoder)
   |> result.map_error(fn(_) { "Failed to decode response data" })
 }
+

@@ -114,7 +114,7 @@ fn sanitize_field_name(name: String) -> String {
 /// Generate imports section
 fn imports_doc() -> Document {
   let import_lines = [
-    "import gleam/dynamic",
+    "import gleam/dynamic/decode",
     "import gleam/http",
     "import gleam/http/request",
     "import gleam/httpc",
@@ -377,20 +377,17 @@ fn generate_decoder_with_schema(
       use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
         type_ref,
       ))
-      let decoder_call =
-        call_doc("dynamic.field", [
+      let field_decoder =
+        doc.concat([
+          doc.from_string("use " <> sanitized_name <> " <- decode.field("),
           string_doc(name),
+          doc.from_string(", "),
           doc.from_string(generate_field_decoder_with_schema(
             gleam_type,
             type_ref,
             schema_types,
           )),
-        ])
-      let field_decoder =
-        doc.concat([
-          doc.from_string("use " <> sanitized_name <> " <- result.try("),
-          decoder_call,
-          doc.from_string("(data))"),
+          doc.from_string(")"),
         ])
       Ok(field_decoder)
     })
@@ -403,32 +400,19 @@ fn generate_decoder_with_schema(
       doc.from_string(sanitized <> ": " <> sanitized)
     })
 
-  // Don't use call_doc for Ok(...) to prevent breaking between Ok( and Constructor
   let success_line =
     doc.concat([
-      doc.from_string("Ok("),
+      doc.from_string("decode.success("),
       call_doc(type_name, constructor_args),
       doc.from_string(")"),
     ])
 
-  let inner_fn_body = list.append(field_decoder_docs, [success_line])
-
-  // Use call_doc for the return type to allow it to break when needed
-  let inner_fn =
-    doc.concat([
-      doc.from_string("fn(data: dynamic.Dynamic) -> "),
-      call_doc("Result", [
-        doc.from_string(type_name),
-        doc.from_string("List(dynamic.DecodeError)"),
-      ]),
-      doc.from_string(" "),
-      block(inner_fn_body),
-    ])
+  let decoder_body = list.append(field_decoder_docs, [success_line])
 
   doc.concat([
-    doc.from_string("pub fn " <> decoder_name <> "() -> dynamic.Decoder("),
+    doc.from_string("pub fn " <> decoder_name <> "() -> decode.Decoder("),
     doc.from_string(type_name <> ") "),
-    block([inner_fn]),
+    block(decoder_body),
   ])
 }
 
@@ -439,26 +423,26 @@ fn generate_field_decoder_with_schema(
   schema_types: dict.Dict(String, schema.Type),
 ) -> String {
   case gleam_type {
-    type_mapping.StringType -> "dynamic.string"
-    type_mapping.IntType -> "dynamic.int"
-    type_mapping.FloatType -> "dynamic.float"
-    type_mapping.BoolType -> "dynamic.bool"
+    type_mapping.StringType -> "decode.string"
+    type_mapping.IntType -> "decode.int"
+    type_mapping.FloatType -> "decode.float"
+    type_mapping.BoolType -> "decode.bool"
     type_mapping.ListType(inner) -> {
       let inner_decoder =
         generate_field_decoder_with_schema_inner(inner, type_ref, schema_types)
-      "dynamic.list(" <> inner_decoder <> ")"
+      "decode.list(" <> inner_decoder <> ")"
     }
     type_mapping.OptionType(inner) -> {
       let inner_decoder =
         generate_field_decoder_with_schema_inner(inner, type_ref, schema_types)
-      "dynamic.optional(" <> inner_decoder <> ")"
+      "decode.optional(" <> inner_decoder <> ")"
     }
     type_mapping.CustomType(name) -> {
       // Check if this is an object type that has a decoder
       case dict.get(schema_types, name) {
         Ok(schema.ObjectType(_, _, _)) ->
           snake_case(name) <> "_decoder()"
-        _ -> "dynamic.dynamic"
+        _ -> "decode.dynamic"
       }
     }
   }
@@ -476,18 +460,18 @@ fn generate_field_decoder_with_schema_inner(
     type_mapping.ListType(inner) -> {
       let inner_decoder =
         generate_field_decoder_with_schema_inner(inner, type_ref, schema_types)
-      "dynamic.list(" <> inner_decoder <> ")"
+      "decode.list(" <> inner_decoder <> ")"
     }
     type_mapping.OptionType(inner) -> {
       let inner_decoder =
         generate_field_decoder_with_schema_inner(inner, type_ref, schema_types)
-      "dynamic.optional(" <> inner_decoder <> ")"
+      "decode.optional(" <> inner_decoder <> ")"
     }
     type_mapping.CustomType(_) ->
       case dict.get(schema_types, base_type_name) {
         Ok(schema.ObjectType(_, _, _)) ->
           snake_case(base_type_name) <> "_decoder()"
-        _ -> "dynamic.dynamic"
+        _ -> "decode.dynamic"
       }
     _ -> generate_field_decoder(gleam_type)
   }
@@ -496,15 +480,15 @@ fn generate_field_decoder_with_schema_inner(
 // Generate field decoder string
 fn generate_field_decoder(gleam_type: type_mapping.GleamType) -> String {
   case gleam_type {
-    type_mapping.StringType -> "dynamic.string"
-    type_mapping.IntType -> "dynamic.int"
-    type_mapping.FloatType -> "dynamic.float"
-    type_mapping.BoolType -> "dynamic.bool"
+    type_mapping.StringType -> "decode.string"
+    type_mapping.IntType -> "decode.int"
+    type_mapping.FloatType -> "decode.float"
+    type_mapping.BoolType -> "decode.bool"
     type_mapping.ListType(inner) ->
-      "dynamic.list(" <> generate_field_decoder(inner) <> ")"
+      "decode.list(" <> generate_field_decoder(inner) <> ")"
     type_mapping.OptionType(inner) ->
-      "dynamic.optional(" <> generate_field_decoder(inner) <> ")"
-    type_mapping.CustomType(_name) -> "dynamic.dynamic"
+      "decode.optional(" <> generate_field_decoder(inner) <> ")"
+    type_mapping.CustomType(_name) -> "decode.dynamic"
   }
 }
 
@@ -526,7 +510,7 @@ fn generate_function(
         |> list.map(fn(var) {
           use gleam_type <- result.try(
             type_mapping.parser_type_to_schema_type(var.type_ref)
-            |> result.then(type_mapping.graphql_to_gleam),
+            |> result.try(type_mapping.graphql_to_gleam),
           )
           let param_name = snake_case(var.name)
           Ok(
@@ -550,7 +534,7 @@ fn generate_function(
         |> list.map(fn(var) {
           use gleam_type <- result.try(
             type_mapping.parser_type_to_schema_type(var.type_ref)
-            |> result.then(type_mapping.graphql_to_gleam),
+            |> result.try(type_mapping.graphql_to_gleam),
           )
           let param_name = snake_case(var.name)
           let value_encoder = encode_variable_value(param_name, gleam_type)
@@ -633,9 +617,9 @@ fn generate_function(
       doc.from_string("use json_value <- result.try("),
       doc.concat([
         doc.line,
-        call_doc("json.decode", [
+        call_doc("json.parse", [
           doc.from_string("from: resp.body"),
-          doc.from_string("using: dynamic.dynamic"),
+          doc.from_string("using: decode.dynamic"),
         ]),
         doc.line,
         doc.from_string(
@@ -647,23 +631,18 @@ fn generate_function(
       doc.from_string(")"),
     ]),
     doc.concat([
-      doc.from_string("use data_field <- result.try("),
+      doc.from_string("let data_and_response_decoder = {"),
+      doc.line |> doc.nest(by: indent),
       doc.concat([
+        doc.from_string("use data <- decode.field(\"data\", " <> snake_case(response_type_name) <> "_decoder())"),
         doc.line,
-        call_doc("dynamic.field", [
-          string_doc("data"),
-          doc.from_string("dynamic.dynamic"),
-        ]),
-        doc.from_string("(json_value)"),
-        doc.line,
-        doc.from_string("|> result.map_error(fn(_) { \"No data field in response\" }),"),
-      ])
-        |> doc.nest(by: indent),
+        doc.from_string("decode.success(data)"),
+      ]) |> doc.nest(by: indent),
       doc.line,
-      doc.from_string(")"),
+      doc.from_string("}"),
     ]),
     doc.concat([
-      doc.from_string(snake_case(response_type_name) <> "_decoder()(data_field)"),
+      doc.from_string("decode.run(json_value, data_and_response_decoder)"),
       doc.line,
       doc.from_string("|> result.map_error(fn(_) { \"Failed to decode response data\" })"),
     ]),
