@@ -129,9 +129,25 @@ fn detect_option_usage_in_gleam_type(
     | type_mapping.IntType
     | type_mapping.FloatType
     | type_mapping.BoolType
+    | type_mapping.DynamicType
     | type_mapping.CustomType(_) -> False
     type_mapping.ListType(inner) -> detect_option_usage_in_gleam_type(inner)
     type_mapping.OptionType(_inner) -> True
+  }
+}
+
+fn detect_dynamic_usage_in_gleam_type(
+  gleam_type: type_mapping.GleamType,
+) -> Bool {
+  case gleam_type {
+    type_mapping.StringType
+    | type_mapping.IntType
+    | type_mapping.FloatType
+    | type_mapping.BoolType
+    | type_mapping.CustomType(_) -> False
+    type_mapping.DynamicType -> True
+    type_mapping.ListType(inner) -> detect_dynamic_usage_in_gleam_type(inner)
+    type_mapping.OptionType(inner) -> detect_dynamic_usage_in_gleam_type(inner)
   }
 }
 
@@ -152,8 +168,25 @@ fn detect_option_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
   })
 }
 
-/// Generate imports section with conditional Option import
-fn imports_doc(needs_option: Bool) -> Document {
+/// Detect if Dynamic types are used in any field
+fn detect_dynamic_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
+  fields
+  |> list.fold(False, fn(acc, field) {
+    let #(_field_name, type_ref) = field
+
+    // Convert to GleamType
+    case type_mapping.graphql_to_gleam_nullable(type_ref) {
+      Ok(gleam_type) -> {
+        let needs_dynamic = detect_dynamic_usage_in_gleam_type(gleam_type)
+        acc || needs_dynamic
+      }
+      Error(_) -> acc
+    }
+  })
+}
+
+/// Generate imports section with conditional Option and Dynamic imports
+fn imports_doc(needs_option: Bool, needs_dynamic: Bool) -> Document {
   let core_imports = [
     "import gleam/dynamic/decode",
     "import gleam/http",
@@ -170,7 +203,13 @@ fn imports_doc(needs_option: Bool) -> Document {
     False -> []
   }
 
+  let dynamic_imports = case needs_dynamic {
+    True -> ["import gleam/dynamic.{type Dynamic}"]
+    False -> []
+  }
+
   list.append(core_imports, optional_imports)
+  |> list.append(dynamic_imports)
   |> list.map(doc.from_string)
   |> doc.join(with: doc.line)
 }
@@ -281,9 +320,10 @@ pub fn generate_operation(
     ])
 
   let needs_option = detect_option_usage(all_field_types)
+  let needs_dynamic = detect_dynamic_usage(all_field_types)
 
   // Build imports
-  let imports = imports_doc(needs_option)
+  let imports = imports_doc(needs_option, needs_dynamic)
 
   // Combine all code using doc combinators
   // Order: imports, input types, nested types, response type, response decoder, function
@@ -598,6 +638,7 @@ fn generate_field_decoder_with_schema(
     type_mapping.IntType -> "decode.int"
     type_mapping.FloatType -> "decode.float"
     type_mapping.BoolType -> "decode.bool"
+    type_mapping.DynamicType -> "decode.dynamic"
     type_mapping.ListType(inner) -> {
       let inner_decoder =
         generate_field_decoder_with_schema_inner(inner, type_ref, schema_types)
@@ -655,6 +696,7 @@ fn generate_field_decoder(gleam_type: type_mapping.GleamType) -> String {
     type_mapping.IntType -> "decode.int"
     type_mapping.FloatType -> "decode.float"
     type_mapping.BoolType -> "decode.bool"
+    type_mapping.DynamicType -> "decode.dynamic"
     type_mapping.ListType(inner) ->
       "decode.list(" <> generate_field_decoder(inner) <> ")"
     type_mapping.OptionType(inner) ->
@@ -756,6 +798,9 @@ fn encode_input_field_value(
       call_doc("json.float", [doc.from_string(field_access)])
     type_mapping.BoolType ->
       call_doc("json.bool", [doc.from_string(field_access)])
+    type_mapping.DynamicType ->
+      // Dynamic types in inputs would need custom encoding, use identity for now
+      doc.from_string(field_access)
     type_mapping.ListType(inner) -> {
       let base_type_name = get_base_type_name(type_ref)
       case dict.get(schema_types, base_type_name) {
@@ -1028,6 +1073,9 @@ fn encode_variable_value(
     type_mapping.FloatType ->
       call_doc("json.float", [doc.from_string(var_name)])
     type_mapping.BoolType -> call_doc("json.bool", [doc.from_string(var_name)])
+    type_mapping.DynamicType ->
+      // Dynamic types in variables would need custom encoding
+      doc.from_string(var_name)
     type_mapping.ListType(inner) -> {
       let base_type_name = get_base_type_name(type_ref)
       case dict.get(schema_types, base_type_name) {
