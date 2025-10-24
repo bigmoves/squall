@@ -7,7 +7,8 @@ import squall/internal/type_mapping
 // Test: Map GraphQL String to Gleam String
 pub fn map_string_type_test() {
   let graphql_type = schema.NamedType("String", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -19,7 +20,8 @@ pub fn map_string_type_test() {
 // Test: Map GraphQL Int to Gleam Int
 pub fn map_int_type_test() {
   let graphql_type = schema.NamedType("Int", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -31,7 +33,8 @@ pub fn map_int_type_test() {
 // Test: Map GraphQL Float to Gleam Float
 pub fn map_float_type_test() {
   let graphql_type = schema.NamedType("Float", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -43,7 +46,8 @@ pub fn map_float_type_test() {
 // Test: Map GraphQL Boolean to Gleam Bool
 pub fn map_boolean_type_test() {
   let graphql_type = schema.NamedType("Boolean", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -55,7 +59,8 @@ pub fn map_boolean_type_test() {
 // Test: Map GraphQL ID to Gleam String
 pub fn map_id_type_test() {
   let graphql_type = schema.NamedType("ID", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -67,7 +72,11 @@ pub fn map_id_type_test() {
 // Test: Map nullable String to Option(String)
 pub fn map_nullable_string_test() {
   let graphql_type = schema.NamedType("String", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam_nullable(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam_nullable(
+      graphql_type,
+      type_mapping.OutputContext,
+    )
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -80,7 +89,8 @@ pub fn map_nullable_string_test() {
 pub fn map_non_null_string_test() {
   let inner = schema.NamedType("String", schema.Scalar)
   let graphql_type = schema.NonNullType(inner)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -96,7 +106,8 @@ pub fn map_non_null_string_test() {
 pub fn map_list_of_strings_test() {
   let inner = schema.NamedType("String", schema.Scalar)
   let graphql_type = schema.ListType(inner)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -112,7 +123,8 @@ pub fn map_non_null_list_non_null_strings_test() {
   let list_type = schema.ListType(non_null_string)
   let graphql_type = schema.NonNullType(list_type)
 
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -124,7 +136,8 @@ pub fn map_non_null_list_non_null_strings_test() {
 // Test: Map custom object type
 pub fn map_custom_object_type_test() {
   let graphql_type = schema.NamedType("Character", schema.Object)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -153,7 +166,8 @@ pub fn parse_variable_type_test() {
 // Test: Unsupported custom scalar
 pub fn unsupported_scalar_test() {
   let graphql_type = schema.NamedType("DateTime", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   // Should map unknown scalars to String by default
   should.be_ok(result)
@@ -162,7 +176,8 @@ pub fn unsupported_scalar_test() {
 // Test: Map GraphQL JSON scalar to Gleam Dynamic (OutputContext)
 pub fn map_json_type_output_test() {
   let graphql_type = schema.NamedType("JSON", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -174,7 +189,8 @@ pub fn map_json_type_output_test() {
 // Test: Map GraphQL JSON scalar to Gleam json.Json (InputContext)
 pub fn map_json_type_input_test() {
   let graphql_type = schema.NamedType("JSON", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.InputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.InputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -186,7 +202,11 @@ pub fn map_json_type_input_test() {
 // Test: Map nullable JSON to Option(Dynamic) (OutputContext)
 pub fn map_nullable_json_output_test() {
   let graphql_type = schema.NamedType("JSON", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam_nullable(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam_nullable(
+      graphql_type,
+      type_mapping.OutputContext,
+    )
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -198,7 +218,11 @@ pub fn map_nullable_json_output_test() {
 // Test: Map nullable JSON to Option(json.Json) (InputContext)
 pub fn map_nullable_json_input_test() {
   let graphql_type = schema.NamedType("JSON", schema.Scalar)
-  let result = type_mapping.graphql_to_gleam_nullable(graphql_type, type_mapping.InputContext)
+  let result =
+    type_mapping.graphql_to_gleam_nullable(
+      graphql_type,
+      type_mapping.InputContext,
+    )
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -220,7 +244,8 @@ pub fn map_nullable_json_input_test() {
 pub fn map_non_null_json_output_test() {
   let inner = schema.NamedType("JSON", schema.Scalar)
   let graphql_type = schema.NonNullType(inner)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.OutputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result
@@ -236,7 +261,8 @@ pub fn map_non_null_json_output_test() {
 pub fn map_non_null_json_input_test() {
   let inner = schema.NamedType("JSON", schema.Scalar)
   let graphql_type = schema.NonNullType(inner)
-  let result = type_mapping.graphql_to_gleam(graphql_type, type_mapping.InputContext)
+  let result =
+    type_mapping.graphql_to_gleam(graphql_type, type_mapping.InputContext)
 
   should.be_ok(result)
   let assert Ok(gleam_type) = result

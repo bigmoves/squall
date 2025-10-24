@@ -13,17 +13,10 @@ pub fn main() {
   io.println("  locationId: \"1\"")
   io.println("  episodeIds: [1, 2]\n")
 
-  let client =
-    squall.new_client("https://rickandmortyapi.com/graphql", [])
+  let client = squall.new_client("https://rickandmortyapi.com/graphql", [])
 
   let result =
-    multi_query_with_vars.multi_query_with_vars(
-      client,
-      2,
-      "rick",
-      "1",
-      [1, 2],
-    )
+    multi_query_with_vars.multi_query_with_vars(client, 2, "rick", "1", [1, 2])
 
   case result {
     Ok(response) -> {

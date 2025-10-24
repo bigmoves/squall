@@ -262,14 +262,16 @@ fn read_string(
   col: Int,
 ) -> Result(#(String, String, Int), Error) {
   case string.pop_grapheme(source) {
-    Error(_) -> Error(error.InvalidGraphQLSyntax("string", 0, "Unterminated string"))
+    Error(_) ->
+      Error(error.InvalidGraphQLSyntax("string", 0, "Unterminated string"))
     Ok(#("\"", rest)) -> Ok(#(acc, rest, col + 1))
     Ok(#("\\", rest)) -> {
       case string.pop_grapheme(rest) {
         Ok(#(escaped, rest2)) -> {
           read_string(rest2, acc <> escaped, col + 2)
         }
-        Error(_) -> Error(error.InvalidGraphQLSyntax("string", 0, "Unterminated string"))
+        Error(_) ->
+          Error(error.InvalidGraphQLSyntax("string", 0, "Unterminated string"))
       }
     }
     Ok(#(char, rest)) -> read_string(rest, acc <> char, col + 1)
@@ -280,7 +282,11 @@ fn read_name(source: String, col: Int) -> #(String, String, Int) {
   read_name_helper(source, "", col)
 }
 
-fn read_name_helper(source: String, acc: String, col: Int) -> #(String, String, Int) {
+fn read_name_helper(
+  source: String,
+  acc: String,
+  col: Int,
+) -> #(String, String, Int) {
   case string.pop_grapheme(source) {
     Error(_) -> #(acc, "", col)
     Ok(#(char, rest)) -> {
@@ -299,7 +305,11 @@ fn read_number(
 ) -> Result(#(Token, String, Int), Error) {
   let #(num_str, rest, new_col) = read_number_helper(source, "", col)
 
-  case string.contains(num_str, ".") || string.contains(num_str, "e") || string.contains(num_str, "E") {
+  case
+    string.contains(num_str, ".")
+    || string.contains(num_str, "e")
+    || string.contains(num_str, "E")
+  {
     True -> {
       // Try to parse as float
       case try_parse_float(num_str) {
@@ -351,11 +361,21 @@ fn try_parse_float(s: String) -> Result(Float, Nil) {
   }
 }
 
-fn read_number_helper(source: String, acc: String, col: Int) -> #(String, String, Int) {
+fn read_number_helper(
+  source: String,
+  acc: String,
+  col: Int,
+) -> #(String, String, Int) {
   case string.pop_grapheme(source) {
     Error(_) -> #(acc, "", col)
     Ok(#(char, rest)) -> {
-      case is_digit(char) || char == "." || char == "-" || char == "e" || char == "E" {
+      case
+        is_digit(char)
+        || char == "."
+        || char == "-"
+        || char == "e"
+        || char == "E"
+      {
         True -> read_number_helper(rest, acc <> char, col + 1)
         False -> #(acc, char <> rest, col)
       }
@@ -365,8 +385,58 @@ fn read_number_helper(source: String, acc: String, col: Int) -> #(String, String
 
 fn is_alpha(char: String) -> Bool {
   case char {
-    "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" ->
-      True
+    "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o"
+    | "p"
+    | "q"
+    | "r"
+    | "s"
+    | "t"
+    | "u"
+    | "v"
+    | "w"
+    | "x"
+    | "y"
+    | "z"
+    | "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O"
+    | "P"
+    | "Q"
+    | "R"
+    | "S"
+    | "T"
+    | "U"
+    | "V"
+    | "W"
+    | "X"
+    | "Y"
+    | "Z" -> True
     _ -> False
   }
 }
@@ -711,7 +781,8 @@ fn parse_name(state: ParserState) -> Result(#(String, ParserState), Error) {
 fn peek_token(state: ParserState) -> Result(TokenPosition, Error) {
   case list.drop(state.tokens, state.position) {
     [token, ..] -> Ok(token)
-    [] -> Error(error.InvalidGraphQLSyntax("parser", 0, "Unexpected end of input"))
+    [] ->
+      Error(error.InvalidGraphQLSyntax("parser", 0, "Unexpected end of input"))
   }
 }
 

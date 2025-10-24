@@ -33,7 +33,8 @@ pub fn to_string(error: Error) -> String {
     SchemaIntrospectionFailed(reason) ->
       "Schema introspection failed: " <> reason
     InvalidSchemaResponse(reason) -> "Invalid schema response: " <> reason
-    CannotReadFile(file, reason) -> "Cannot read file " <> file <> ": " <> reason
+    CannotReadFile(file, reason) ->
+      "Cannot read file " <> file <> ": " <> reason
     CannotWriteToFile(file, reason) ->
       "Cannot write to file " <> file <> ": " <> reason
     InvalidGraphQLSyntax(file, line, message) ->
@@ -44,12 +45,7 @@ pub fn to_string(error: Error) -> String {
       <> ": "
       <> message
     InvalidOperationName(file, name, reason) ->
-      "Invalid operation name '"
-      <> name
-      <> "' in "
-      <> file
-      <> ": "
-      <> reason
+      "Invalid operation name '" <> name <> "' in " <> file <> ": " <> reason
     UnsupportedGraphQLType(file, type_name) ->
       "Unsupported GraphQL type '" <> type_name <> "' in " <> file
     InvalidTypeMapping(reason) -> "Invalid type mapping: " <> reason

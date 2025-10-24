@@ -14,7 +14,10 @@ pub type Characters {
 
 pub fn characters_decoder() -> decode.Decoder(Characters) {
   use info <- decode.field("info", decode.optional(info_decoder()))
-  use results <- decode.field("results", decode.optional(decode.list(character_decoder())))
+  use results <- decode.field(
+    "results",
+    decode.optional(decode.list(character_decoder())),
+  )
   decode.success(Characters(info: info, results: results))
 }
 
@@ -64,10 +67,18 @@ pub type MultiQueryWithVarsResponse {
   )
 }
 
-pub fn multi_query_with_vars_response_decoder() -> decode.Decoder(MultiQueryWithVarsResponse) {
-  use characters <- decode.field("characters", decode.optional(characters_decoder()))
+pub fn multi_query_with_vars_response_decoder() -> decode.Decoder(
+  MultiQueryWithVarsResponse,
+) {
+  use characters <- decode.field(
+    "characters",
+    decode.optional(characters_decoder()),
+  )
   use location <- decode.field("location", decode.optional(location_decoder()))
-  use episodes_by_ids <- decode.field("episodesByIds", decode.optional(decode.list(episode_decoder())))
+  use episodes_by_ids <- decode.field(
+    "episodesByIds",
+    decode.optional(decode.list(episode_decoder())),
+  )
   decode.success(MultiQueryWithVarsResponse(
     characters: characters,
     location: location,
@@ -75,18 +86,22 @@ pub fn multi_query_with_vars_response_decoder() -> decode.Decoder(MultiQueryWith
   ))
 }
 
-pub fn multi_query_with_vars(client: squall.Client, page: Int, name: String, location_id: String, episode_ids: List(Int)) -> Result(MultiQueryWithVarsResponse, String) {
+pub fn multi_query_with_vars(
+  client: squall.Client,
+  page: Int,
+  name: String,
+  location_id: String,
+  episode_ids: List(Int),
+) -> Result(MultiQueryWithVarsResponse, String) {
   let query =
     "query MultiQueryWithVars($page: Int, $name: String, $locationId: ID!, $episodeIds: [Int!]!) { characters(page: $page, filter: { name: $name }) { info { count } results { name } } location(id: $locationId) { id name } episodesByIds(ids: $episodeIds) { id name } }"
   let variables =
-    json.object(
-      [
-        #("page", json.int(page)),
-        #("name", json.string(name)),
-        #("locationId", json.string(location_id)),
-        #("episodeIds", json.array(from: episode_ids, of: json.int)),
-      ],
-    )
+    json.object([
+      #("page", json.int(page)),
+      #("name", json.string(name)),
+      #("locationId", json.string(location_id)),
+      #("episodeIds", json.array(from: episode_ids, of: json.int)),
+    ])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(

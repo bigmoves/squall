@@ -14,7 +14,10 @@ pub type Characters {
 
 pub fn characters_decoder() -> decode.Decoder(Characters) {
   use info <- decode.field("info", decode.optional(info_decoder()))
-  use results <- decode.field("results", decode.optional(decode.list(character_decoder())))
+  use results <- decode.field(
+    "results",
+    decode.optional(decode.list(character_decoder())),
+  )
   decode.success(Characters(info: info, results: results))
 }
 
@@ -63,9 +66,15 @@ pub type MultiQueryResponse {
 }
 
 pub fn multi_query_response_decoder() -> decode.Decoder(MultiQueryResponse) {
-  use characters <- decode.field("characters", decode.optional(characters_decoder()))
+  use characters <- decode.field(
+    "characters",
+    decode.optional(characters_decoder()),
+  )
   use location <- decode.field("location", decode.optional(location_decoder()))
-  use episodes_by_ids <- decode.field("episodesByIds", decode.optional(decode.list(episode_decoder())))
+  use episodes_by_ids <- decode.field(
+    "episodesByIds",
+    decode.optional(decode.list(episode_decoder())),
+  )
   decode.success(MultiQueryResponse(
     characters: characters,
     location: location,
@@ -76,8 +85,7 @@ pub fn multi_query_response_decoder() -> decode.Decoder(MultiQueryResponse) {
 pub fn multi_query(client: squall.Client) -> Result(MultiQueryResponse, String) {
   let query =
     "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }"
-  let variables =
-    json.object([])
+  let variables = json.object([])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
