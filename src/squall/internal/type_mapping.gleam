@@ -5,6 +5,12 @@ import squall/internal/error.{type Error}
 import squall/internal/parser
 import squall/internal/schema
 
+// Type context for distinguishing input vs output types
+pub type TypeContext {
+  InputContext
+  OutputContext
+}
+
 // Gleam type representation
 pub type GleamType {
   StringType
@@ -12,40 +18,49 @@ pub type GleamType {
   FloatType
   BoolType
   DynamicType
+  JsonType
   ListType(inner: GleamType)
   OptionType(inner: GleamType)
   CustomType(name: String)
 }
 
 // Map GraphQL schema type to Gleam type
-pub fn graphql_to_gleam(type_ref: schema.TypeRef) -> Result(GleamType, Error) {
+pub fn graphql_to_gleam(
+  type_ref: schema.TypeRef,
+  context: TypeContext,
+) -> Result(GleamType, Error) {
   case type_ref {
-    schema.NamedType(name, kind) -> map_named_type(name, kind)
+    schema.NamedType(name, kind) -> map_named_type(name, kind, context)
     schema.ListType(inner) -> {
-      use inner_gleam <- result.try(graphql_to_gleam(inner))
+      use inner_gleam <- result.try(graphql_to_gleam(inner, context))
       Ok(ListType(inner_gleam))
     }
-    schema.NonNullType(inner) -> graphql_to_gleam(inner)
+    schema.NonNullType(inner) -> graphql_to_gleam(inner, context)
   }
 }
 
 // Map nullable GraphQL type to Gleam type (wraps in Option)
 pub fn graphql_to_gleam_nullable(
   type_ref: schema.TypeRef,
+  context: TypeContext,
 ) -> Result(GleamType, Error) {
   case type_ref {
-    schema.NonNullType(inner) -> graphql_to_gleam(inner)
+    schema.NonNullType(inner) -> graphql_to_gleam(inner, context)
     _ -> {
-      use gleam_type <- result.try(graphql_to_gleam(type_ref))
+      use gleam_type <- result.try(graphql_to_gleam(type_ref, context))
       Ok(OptionType(gleam_type))
     }
   }
 }
 
 // Map named GraphQL type to Gleam type
-fn map_named_type(name: String, kind: schema.TypeKind) -> Result(GleamType, Error) {
+fn map_named_type(
+  name: String,
+  kind: schema.TypeKind,
+  context: TypeContext,
+) -> Result(GleamType, Error) {
   case kind {
-    schema.Scalar -> map_scalar_type(name)
+    schema.Scalar -> map_scalar_type(name, context)
     schema.Object -> Ok(CustomType(name))
     schema.Interface -> Ok(CustomType(name))
     schema.Union -> Ok(CustomType(name))
@@ -56,14 +71,18 @@ fn map_named_type(name: String, kind: schema.TypeKind) -> Result(GleamType, Erro
 }
 
 // Map scalar types
-fn map_scalar_type(name: String) -> Result(GleamType, Error) {
+fn map_scalar_type(name: String, context: TypeContext) -> Result(GleamType, Error) {
   case name {
     "String" -> Ok(StringType)
     "Int" -> Ok(IntType)
     "Float" -> Ok(FloatType)
     "Boolean" -> Ok(BoolType)
     "ID" -> Ok(StringType)
-    "JSON" -> Ok(DynamicType)
+    "JSON" ->
+      case context {
+        InputContext -> Ok(JsonType)
+        OutputContext -> Ok(DynamicType)
+      }
     // Unknown scalars default to String
     _ -> Ok(StringType)
   }
@@ -159,6 +178,13 @@ pub fn is_dynamic_type(gleam_type: GleamType) -> Bool {
   }
 }
 
+pub fn is_json_type(gleam_type: GleamType) -> Bool {
+  case gleam_type {
+    JsonType -> True
+    _ -> False
+  }
+}
+
 pub fn is_list_type(gleam_type: GleamType) -> Bool {
   case gleam_type {
     ListType(_) -> True
@@ -195,6 +221,7 @@ pub fn to_gleam_type_string(gleam_type: GleamType) -> String {
     FloatType -> "Float"
     BoolType -> "Bool"
     DynamicType -> "Dynamic"
+    JsonType -> "json.Json"
     ListType(inner) -> "List(" <> to_gleam_type_string(inner) <> ")"
     OptionType(inner) -> "Option(" <> to_gleam_type_string(inner) <> ")"
     CustomType(name) -> name

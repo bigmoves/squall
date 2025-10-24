@@ -1,8 +1,8 @@
 ---
 version: 1.4.1
-title: Mutation with InputObject variable
+title: Mutation with optional InputObject fields (imports Some, None)
 file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_input_object_test
+test_name: generate_mutation_with_optional_input_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -15,7 +15,11 @@ import squall
 import gleam/option.{type Option, Some, None}
 
 pub type ProfileInput {
-  ProfileInput(display_name: Option(String), description: Option(String))
+  ProfileInput(
+    display_name: Option(String),
+    description: Option(String),
+    avatar: Option(json.Json),
+  )
 }
 
 fn profile_input_to_json(input: ProfileInput) -> json.Json {
@@ -29,6 +33,11 @@ fn profile_input_to_json(input: ProfileInput) -> json.Json {
         Some(val) -> Some(#("description", json.string(val)))
         None -> None
       }
+    }, {
+      case input.avatar {
+        Some(val) -> Some(#("avatar", val))
+        None -> None
+      }
     }]
   |> list.filter_map(fn(x) {
     case x {
@@ -40,27 +49,32 @@ fn profile_input_to_json(input: ProfileInput) -> json.Json {
 }
 
 pub type Profile {
-  Profile(id: String, display_name: Option(String))
+  Profile(id: String, display_name: Option(String), description: Option(String))
 }
 
 pub fn profile_decoder() -> decode.Decoder(Profile) {
   use id <- decode.field("id", decode.string)
   use display_name <- decode.field("displayName", decode.optional(decode.string))
-  decode.success(Profile(id: id, display_name: display_name))
+  use description <- decode.field("description", decode.optional(decode.string))
+  decode.success(Profile(
+    id: id,
+    display_name: display_name,
+    description: description,
+  ))
 }
 
-pub type UpdateProfileResponse {
-  UpdateProfileResponse(update_profile: Option(Profile))
+pub type CreateProfileResponse {
+  CreateProfileResponse(create_profile: Option(Profile))
 }
 
-pub fn update_profile_response_decoder() -> decode.Decoder(UpdateProfileResponse) {
-  use update_profile <- decode.field("updateProfile", decode.optional(profile_decoder()))
-  decode.success(UpdateProfileResponse(update_profile: update_profile))
+pub fn create_profile_response_decoder() -> decode.Decoder(CreateProfileResponse) {
+  use create_profile <- decode.field("createProfile", decode.optional(profile_decoder()))
+  decode.success(CreateProfileResponse(create_profile: create_profile))
 }
 
-pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(UpdateProfileResponse, String) {
+pub fn create_profile(client: squall.Client, input: ProfileInput) -> Result(CreateProfileResponse, String) {
   let query =
-    "mutation UpdateProfile($input: ProfileInput!) { updateProfile(input: $input) { id displayName } }"
+    "mutation CreateProfile($input: ProfileInput!) { createProfile(input: $input) { id displayName description } }"
   let variables =
     json.object([#("input", profile_input_to_json(input))])
   let body =
@@ -87,7 +101,7 @@ pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(Upda
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
   let data_and_response_decoder = {
-    use data <- decode.field("data", update_profile_response_decoder())
+    use data <- decode.field("data", create_profile_response_decoder())
     decode.success(data)
   }
   decode.run(json_value, data_and_response_decoder)
