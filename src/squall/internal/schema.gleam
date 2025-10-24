@@ -51,11 +51,7 @@ pub type Type {
     possible_types: List(String),
     description: Option(String),
   )
-  EnumType(
-    name: String,
-    enum_values: List(String),
-    description: Option(String),
-  )
+  EnumType(name: String, enum_values: List(String), description: Option(String))
   InputObjectType(
     name: String,
     input_fields: List(InputValue),
@@ -139,7 +135,9 @@ fn decode_schema(dyn: Dynamic) -> Result(Schema, Error) {
   }
 
   // Parse optional subscription type
-  let subscription_type = case field(schema_obj, "subscriptionType", decode.dynamic) {
+  let subscription_type = case
+    field(schema_obj, "subscriptionType", decode.dynamic)
+  {
     Ok(st) -> optional_field(st, "name", decode.string)
     Error(_) -> None
   }
@@ -197,7 +195,9 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "UNION" -> {
-      let possible_types = case field(dyn, "possibleTypes", decode.list(of: decode.dynamic)) {
+      let possible_types = case
+        field(dyn, "possibleTypes", decode.list(of: decode.dynamic))
+      {
         Ok(types_dyn) -> {
           list.try_map(types_dyn, fn(d) {
             field(d, "name", decode.string)
@@ -212,7 +212,9 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "ENUM" -> {
-      let enum_values = case field(dyn, "enumValues", decode.list(of: decode.dynamic)) {
+      let enum_values = case
+        field(dyn, "enumValues", decode.list(of: decode.dynamic))
+      {
         Ok(values_dyn) -> {
           list.try_map(values_dyn, fn(d) {
             field(d, "name", decode.string)
@@ -227,7 +229,9 @@ fn decode_type(dyn: Dynamic) -> Result(Type, Error) {
     }
 
     "INPUT_OBJECT" -> {
-      let input_fields = case field(dyn, "inputFields", decode.list(of: decode.dynamic)) {
+      let input_fields = case
+        field(dyn, "inputFields", decode.list(of: decode.dynamic))
+      {
         Ok(fields_dyn) -> {
           list.try_map(fields_dyn, decode_input_value)
           |> result.unwrap([])

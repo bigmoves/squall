@@ -92,10 +92,12 @@ fn block(body: List(Document)) -> Document {
 
 /// A pretty printed let assignment.
 fn let_var(name: String, body: Document) -> Document {
-  doc.group(doc.concat([
-    doc.from_string("let " <> name <> " ="),
-    doc.nest(doc.concat([doc.line, body]), by: indent),
-  ]))
+  doc.group(
+    doc.concat([
+      doc.from_string("let " <> name <> " ="),
+      doc.nest(doc.concat([doc.line, body]), by: indent),
+    ]),
+  )
 }
 
 /// A pretty printed Gleam string with proper escaping.
@@ -121,9 +123,7 @@ fn sanitize_field_name(name: String) -> String {
 }
 
 /// Recursively detect if Option types are used
-fn detect_option_usage_in_gleam_type(
-  gleam_type: type_mapping.GleamType,
-) -> Bool {
+fn detect_option_usage_in_gleam_type(gleam_type: type_mapping.GleamType) -> Bool {
   case gleam_type {
     type_mapping.StringType
     | type_mapping.IntType
@@ -160,7 +160,12 @@ fn detect_option_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
     let #(_field_name, type_ref) = field
 
     // Convert to GleamType (use OutputContext for response types)
-    case type_mapping.graphql_to_gleam_nullable(type_ref, type_mapping.OutputContext) {
+    case
+      type_mapping.graphql_to_gleam_nullable(
+        type_ref,
+        type_mapping.OutputContext,
+      )
+    {
       Ok(gleam_type) -> {
         let needs_option = detect_option_usage_in_gleam_type(gleam_type)
         acc || needs_option
@@ -177,7 +182,12 @@ fn detect_dynamic_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
     let #(_field_name, type_ref) = field
 
     // Convert to GleamType (use OutputContext for response types)
-    case type_mapping.graphql_to_gleam_nullable(type_ref, type_mapping.OutputContext) {
+    case
+      type_mapping.graphql_to_gleam_nullable(
+        type_ref,
+        type_mapping.OutputContext,
+      )
+    {
       Ok(gleam_type) -> {
         let needs_dynamic = detect_dynamic_usage_in_gleam_type(gleam_type)
         acc || needs_dynamic
@@ -203,7 +213,11 @@ fn detect_optional_input_fields(input_types: List(InputTypeInfo)) -> Bool {
 }
 
 /// Generate imports section with conditional Option and Dynamic imports
-fn imports_doc(needs_option: Bool, needs_dynamic: Bool, needs_option_constructors: Bool) -> Document {
+fn imports_doc(
+  needs_option: Bool,
+  needs_dynamic: Bool,
+  needs_option_constructors: Bool,
+) -> Document {
   let core_imports = [
     "import gleam/dynamic/decode",
     "import gleam/http",
@@ -299,11 +313,18 @@ pub fn generate_operation(
 
   // Generate response decoder
   let decoder =
-    generate_decoder_with_schema(response_type_name, field_types, schema_data.types)
+    generate_decoder_with_schema(
+      response_type_name,
+      field_types,
+      schema_data.types,
+    )
 
   // Collect Input types from variables
   let variables = parser.get_variables(operation)
-  use input_types <- result.try(collect_input_types(variables, schema_data.types))
+  use input_types <- result.try(collect_input_types(
+    variables,
+    schema_data.types,
+  ))
 
   // Generate Input type definitions and serializers
   let input_docs =
@@ -347,7 +368,8 @@ pub fn generate_operation(
   let needs_option_constructors = detect_optional_input_fields(input_types)
 
   // Build imports
-  let imports = imports_doc(needs_option, needs_dynamic, needs_option_constructors)
+  let imports =
+    imports_doc(needs_option, needs_dynamic, needs_option_constructors)
 
   // Combine all code using doc combinators
   // Order: imports, input types, nested types, response type, response decoder, function
@@ -520,7 +542,9 @@ fn collect_input_types_from_type_ref(
               use input_type <- result.try(
                 dict.get(schema_types, name)
                 |> result.map_error(fn(_) {
-                  error.InvalidSchemaResponse("InputObject type not found: " <> name)
+                  error.InvalidSchemaResponse(
+                    "InputObject type not found: " <> name,
+                  )
                 }),
               )
 
@@ -687,8 +711,7 @@ fn generate_field_decoder_with_schema(
     type_mapping.CustomType(name) -> {
       // Check if this is an object type that has a decoder
       case dict.get(schema_types, name) {
-        Ok(schema.ObjectType(_, _, _)) ->
-          snake_case(name) <> "_decoder()"
+        Ok(schema.ObjectType(_, _, _)) -> snake_case(name) <> "_decoder()"
         _ -> "decode.dynamic"
       }
     }
@@ -804,7 +827,9 @@ fn generate_input_serializer(input_info: InputTypeInfo) -> Document {
             doc.concat([
               doc.from_string("{"),
               doc.line,
-              doc.from_string("  case " <> param_name <> "." <> sanitized_name <> " {"),
+              doc.from_string(
+                "  case " <> param_name <> "." <> sanitized_name <> " {",
+              ),
               doc.line,
               doc.from_string("    Some(val) -> Some(#("),
               string_doc(input_value.name),
@@ -993,11 +1018,9 @@ fn generate_function(
             type_mapping.InputContext,
           ))
           let param_name = snake_case(var.name)
-          Ok(
-            doc.from_string(
-              param_name <> ": " <> type_mapping.to_gleam_type_string(gleam_type),
-            ),
-          )
+          Ok(doc.from_string(
+            param_name <> ": " <> type_mapping.to_gleam_type_string(gleam_type),
+          ))
         })
         |> list.filter_map(fn(r) { r })
 
@@ -1053,10 +1076,14 @@ fn generate_function(
     let_var(
       "body",
       call_doc("json.object", [
-        comma_list("[", [
-          doc.from_string("#(\"query\", json.string(query))"),
-          doc.from_string("#(\"variables\", variables)"),
-        ], "]"),
+        comma_list(
+          "[",
+          [
+            doc.from_string("#(\"query\", json.string(query))"),
+            doc.from_string("#(\"variables\", variables)"),
+          ],
+          "]",
+        ),
       ]),
     ),
     doc.concat([
@@ -1065,7 +1092,9 @@ fn generate_function(
         doc.line,
         call_doc("request.to", [doc.from_string("client.endpoint")]),
         doc.line,
-        doc.from_string("|> result.map_error(fn(_) { \"Invalid endpoint URL\" }),"),
+        doc.from_string(
+          "|> result.map_error(fn(_) { \"Invalid endpoint URL\" }),",
+        ),
       ])
         |> doc.nest(by: indent),
       doc.line,
@@ -1080,7 +1109,9 @@ fn generate_function(
         doc.line,
         doc.from_string("|> request.set_body(json.to_string(body))"),
         doc.line,
-        doc.from_string("|> request.set_header(\"content-type\", \"application/json\")"),
+        doc.from_string(
+          "|> request.set_header(\"content-type\", \"application/json\")",
+        ),
       ]),
     ),
     let_var(
@@ -1099,7 +1130,9 @@ fn generate_function(
         doc.line,
         call_doc("httpc.send", [doc.from_string("req")]),
         doc.line,
-        doc.from_string("|> result.map_error(fn(_) { \"HTTP request failed\" }),"),
+        doc.from_string(
+          "|> result.map_error(fn(_) { \"HTTP request failed\" }),",
+        ),
       ])
         |> doc.nest(by: indent),
       doc.line,
@@ -1126,25 +1159,31 @@ fn generate_function(
       doc.from_string("let data_and_response_decoder = {"),
       doc.line |> doc.nest(by: indent),
       doc.concat([
-        doc.from_string("use data <- decode.field(\"data\", " <> snake_case(response_type_name) <> "_decoder())"),
+        doc.from_string(
+          "use data <- decode.field(\"data\", "
+          <> snake_case(response_type_name)
+          <> "_decoder())",
+        ),
         doc.line,
         doc.from_string("decode.success(data)"),
-      ]) |> doc.nest(by: indent),
+      ])
+        |> doc.nest(by: indent),
       doc.line,
       doc.from_string("}"),
     ]),
     doc.concat([
       doc.from_string("decode.run(json_value, data_and_response_decoder)"),
       doc.line,
-      doc.from_string("|> result.map_error(fn(_) { \"Failed to decode response data\" })"),
+      doc.from_string(
+        "|> result.map_error(fn(_) { \"Failed to decode response data\" })",
+      ),
     ]),
   ]
 
   // Build function signature
   // Don't use call_doc for return type to prevent it from breaking before parameters
-  let return_type = doc.from_string(
-    "Result(" <> response_type_name <> ", String)",
-  )
+  let return_type =
+    doc.from_string("Result(" <> response_type_name <> ", String)")
 
   doc.concat([
     doc.from_string("pub fn " <> function_name),
@@ -1370,4 +1409,3 @@ fn snake_case(s: String) -> String {
     }
   })
 }
-

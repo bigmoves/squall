@@ -13,7 +13,10 @@ pub type Characters {
 }
 
 pub fn characters_decoder() -> decode.Decoder(Characters) {
-  use results <- decode.field("results", decode.optional(decode.list(character_decoder())))
+  use results <- decode.field(
+    "results",
+    decode.optional(decode.list(character_decoder())),
+  )
   decode.success(Characters(results: results))
 }
 
@@ -38,16 +41,22 @@ pub type GetCharactersResponse {
   GetCharactersResponse(characters: Option(Characters))
 }
 
-pub fn get_characters_response_decoder() -> decode.Decoder(GetCharactersResponse) {
-  use characters <- decode.field("characters", decode.optional(characters_decoder()))
+pub fn get_characters_response_decoder() -> decode.Decoder(
+  GetCharactersResponse,
+) {
+  use characters <- decode.field(
+    "characters",
+    decode.optional(characters_decoder()),
+  )
   decode.success(GetCharactersResponse(characters: characters))
 }
 
-pub fn get_characters(client: squall.Client) -> Result(GetCharactersResponse, String) {
+pub fn get_characters(
+  client: squall.Client,
+) -> Result(GetCharactersResponse, String) {
   let query =
     "query GetCharacters { characters { results { id name status species } } }"
-  let variables =
-    json.object([])
+  let variables = json.object([])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(

@@ -17,8 +17,7 @@ pub fn find_graphql_files(root: String) -> Result(List(GraphQLFile), Error) {
       let gql_files =
         paths
         |> list.filter(fn(path) {
-          string.ends_with(path, ".gql")
-          && string.contains(path, "/graphql/")
+          string.ends_with(path, ".gql") && string.contains(path, "/graphql/")
         })
         |> list.sort(string.compare)
 
@@ -88,8 +87,32 @@ fn is_valid_gleam_identifier(name: String) -> Bool {
 
 fn is_lowercase_letter(char: String) -> Bool {
   case char {
-    "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ->
-      True
+    "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o"
+    | "p"
+    | "q"
+    | "r"
+    | "s"
+    | "t"
+    | "u"
+    | "v"
+    | "w"
+    | "x"
+    | "y"
+    | "z" -> True
     _ -> False
   }
 }

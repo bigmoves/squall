@@ -71,7 +71,10 @@ fn map_named_type(
 }
 
 // Map scalar types
-fn map_scalar_type(name: String, context: TypeContext) -> Result(GleamType, Error) {
+fn map_scalar_type(
+  name: String,
+  context: TypeContext,
+) -> Result(GleamType, Error) {
   case name {
     "String" -> Ok(StringType)
     "Int" -> Ok(IntType)

@@ -7,8 +7,7 @@ pub fn main() {
   io.println("Squall Multi-Field Query Example")
   io.println("=================================\n")
 
-  let client =
-    squall.new_client("https://rickandmortyapi.com/graphql", [])
+  let client = squall.new_client("https://rickandmortyapi.com/graphql", [])
 
   let result = multi_query.multi_query(client)
 

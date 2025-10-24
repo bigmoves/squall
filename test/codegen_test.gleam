@@ -556,10 +556,9 @@ pub fn generate_inline_array_arguments_test() {
                 [
                   schema.InputValue(
                     "ids",
-                    schema.ListType(schema.NonNullType(schema.NamedType(
-                      "Int",
-                      schema.Scalar,
-                    ))),
+                    schema.ListType(
+                      schema.NonNullType(schema.NamedType("Int", schema.Scalar)),
+                    ),
                     None,
                   ),
                 ],
@@ -617,12 +616,7 @@ pub fn generate_multiple_root_fields_test() {
   ]
 
   let characters_result_fields = [
-    schema.Field(
-      "info",
-      schema.NamedType("Info", schema.Object),
-      [],
-      None,
-    ),
+    schema.Field("info", schema.NamedType("Info", schema.Object), [], None),
     schema.Field(
       "results",
       schema.ListType(schema.NamedType("Character", schema.Object)),
@@ -693,10 +687,9 @@ pub fn generate_multiple_root_fields_test() {
                 [
                   schema.InputValue(
                     "ids",
-                    schema.ListType(schema.NonNullType(schema.NamedType(
-                      "Int",
-                      schema.Scalar,
-                    ))),
+                    schema.ListType(
+                      schema.NonNullType(schema.NamedType("Int", schema.Scalar)),
+                    ),
                     None,
                   ),
                 ],
@@ -715,7 +708,9 @@ pub fn generate_multiple_root_fields_test() {
   case result {
     Ok(code) -> {
       code
-      |> birdie.snap(title: "Query with multiple root fields and mixed arguments")
+      |> birdie.snap(
+        title: "Query with multiple root fields and mixed arguments",
+      )
     }
     Error(_) -> Nil
   }
@@ -855,10 +850,9 @@ pub fn generate_mutation_with_nested_input_object_test() {
     ),
     schema.InputValue(
       "interests",
-      schema.ListType(schema.NonNullType(schema.NamedType(
-        "String",
-        schema.Scalar,
-      ))),
+      schema.ListType(
+        schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      ),
       None,
     ),
   ]
@@ -1000,7 +994,9 @@ pub fn generate_query_with_all_non_nullable_fields_test() {
   case result {
     Ok(code) -> {
       code
-      |> birdie.snap(title: "Query with all non-nullable fields (no Option import)")
+      |> birdie.snap(
+        title: "Query with all non-nullable fields (no Option import)",
+      )
     }
     Error(_) -> Nil
   }
@@ -1091,11 +1087,7 @@ pub fn generate_mutation_with_json_input_field_test() {
 
   // Define InputObject type with JSON field
   let settings_input_fields = [
-    schema.InputValue(
-      "metadata",
-      schema.NamedType("JSON", schema.Scalar),
-      None,
-    ),
+    schema.InputValue("metadata", schema.NamedType("JSON", schema.Scalar), None),
     schema.InputValue(
       "displayName",
       schema.NamedType("String", schema.Scalar),
@@ -1110,12 +1102,7 @@ pub fn generate_mutation_with_json_input_field_test() {
       [],
       None,
     ),
-    schema.Field(
-      "metadata",
-      schema.NamedType("JSON", schema.Scalar),
-      [],
-      None,
-    ),
+    schema.Field("metadata", schema.NamedType("JSON", schema.Scalar), [], None),
   ]
 
   let mock_schema =
@@ -1195,11 +1182,7 @@ pub fn generate_mutation_with_optional_input_fields_test() {
       schema.NamedType("String", schema.Scalar),
       None,
     ),
-    schema.InputValue(
-      "avatar",
-      schema.NamedType("JSON", schema.Scalar),
-      None,
-    ),
+    schema.InputValue("avatar", schema.NamedType("JSON", schema.Scalar), None),
   ]
 
   let profile_fields = [
