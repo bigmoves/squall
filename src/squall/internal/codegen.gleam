@@ -130,6 +130,7 @@ fn detect_option_usage_in_gleam_type(
     | type_mapping.FloatType
     | type_mapping.BoolType
     | type_mapping.DynamicType
+    | type_mapping.JsonType
     | type_mapping.CustomType(_) -> False
     type_mapping.ListType(inner) -> detect_option_usage_in_gleam_type(inner)
     type_mapping.OptionType(_inner) -> True
@@ -144,6 +145,7 @@ fn detect_dynamic_usage_in_gleam_type(
     | type_mapping.IntType
     | type_mapping.FloatType
     | type_mapping.BoolType
+    | type_mapping.JsonType
     | type_mapping.CustomType(_) -> False
     type_mapping.DynamicType -> True
     type_mapping.ListType(inner) -> detect_dynamic_usage_in_gleam_type(inner)
@@ -157,8 +159,8 @@ fn detect_option_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
   |> list.fold(False, fn(acc, field) {
     let #(_field_name, type_ref) = field
 
-    // Convert to GleamType
-    case type_mapping.graphql_to_gleam_nullable(type_ref) {
+    // Convert to GleamType (use OutputContext for response types)
+    case type_mapping.graphql_to_gleam_nullable(type_ref, type_mapping.OutputContext) {
       Ok(gleam_type) -> {
         let needs_option = detect_option_usage_in_gleam_type(gleam_type)
         acc || needs_option
@@ -174,8 +176,8 @@ fn detect_dynamic_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
   |> list.fold(False, fn(acc, field) {
     let #(_field_name, type_ref) = field
 
-    // Convert to GleamType
-    case type_mapping.graphql_to_gleam_nullable(type_ref) {
+    // Convert to GleamType (use OutputContext for response types)
+    case type_mapping.graphql_to_gleam_nullable(type_ref, type_mapping.OutputContext) {
       Ok(gleam_type) -> {
         let needs_dynamic = detect_dynamic_usage_in_gleam_type(gleam_type)
         acc || needs_dynamic
@@ -185,8 +187,23 @@ fn detect_dynamic_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
   })
 }
 
+/// Detect if Some/None constructors are needed (only for input serializers with optional fields)
+fn detect_optional_input_fields(input_types: List(InputTypeInfo)) -> Bool {
+  input_types
+  |> list.any(fn(input_info) {
+    input_info.input_fields
+    |> list.any(fn(field) {
+      // Check if field is NOT NonNullType (i.e., it's optional)
+      case field.type_ref {
+        schema.NonNullType(_) -> False
+        _ -> True
+      }
+    })
+  })
+}
+
 /// Generate imports section with conditional Option and Dynamic imports
-fn imports_doc(needs_option: Bool, needs_dynamic: Bool) -> Document {
+fn imports_doc(needs_option: Bool, needs_dynamic: Bool, needs_option_constructors: Bool) -> Document {
   let core_imports = [
     "import gleam/dynamic/decode",
     "import gleam/http",
@@ -198,9 +215,10 @@ fn imports_doc(needs_option: Bool, needs_dynamic: Bool) -> Document {
     "import squall",
   ]
 
-  let optional_imports = case needs_option {
-    True -> ["import gleam/option.{type Option}"]
-    False -> []
+  let optional_imports = case needs_option, needs_option_constructors {
+    False, _ -> []
+    True, False -> ["import gleam/option.{type Option}"]
+    True, True -> ["import gleam/option.{type Option, Some, None}"]
   }
 
   let dynamic_imports = case needs_dynamic {
@@ -308,22 +326,28 @@ pub fn generate_operation(
     )
 
   // Detect Option type usage from all field types
-  // Collect all field types: response, nested, input, and variables
-  let all_field_types =
+  // Separate output fields (response/nested) from input fields for proper context detection
+  let output_field_types =
     list.flatten([
       field_types,
       list.flat_map(nested_types, fn(nt) { nt.fields }),
-      list.flat_map(input_types, fn(it) {
-        it.input_fields
-        |> list.map(fn(iv) { #(iv.name, iv.type_ref) })
-      }),
     ])
 
+  let input_field_types =
+    list.flat_map(input_types, fn(it) {
+      it.input_fields
+      |> list.map(fn(iv) { #(iv.name, iv.type_ref) })
+    })
+
+  let all_field_types = list.append(output_field_types, input_field_types)
+
   let needs_option = detect_option_usage(all_field_types)
-  let needs_dynamic = detect_dynamic_usage(all_field_types)
+  // Only check output fields for Dynamic usage (input fields use json.Json, not Dynamic)
+  let needs_dynamic = detect_dynamic_usage(output_field_types)
+  let needs_option_constructors = detect_optional_input_fields(input_types)
 
   // Build imports
-  let imports = imports_doc(needs_option, needs_dynamic)
+  let imports = imports_doc(needs_option, needs_dynamic, needs_option_constructors)
 
   // Combine all code using doc combinators
   // Order: imports, input types, nested types, response type, response decoder, function
@@ -441,6 +465,14 @@ fn get_base_type_name(type_ref: schema.TypeRef) -> String {
   }
 }
 
+// Unwrap NonNull wrapper from optional type
+fn unwrap_option_type(type_ref: schema.TypeRef) -> schema.TypeRef {
+  case type_ref {
+    schema.NonNullType(inner) -> inner
+    _ -> type_ref
+  }
+}
+
 // Collect all InputObject types used in variables
 fn collect_input_types(
   variables: List(parser.Variable),
@@ -547,6 +579,7 @@ fn generate_type_definition(
       let sanitized_name = sanitize_field_name(name)
       use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
         type_ref,
+        type_mapping.OutputContext,
       ))
       let field_doc =
         doc.concat([
@@ -587,6 +620,7 @@ fn generate_decoder_with_schema(
       let sanitized_name = sanitize_field_name(name)
       use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
         type_ref,
+        type_mapping.OutputContext,
       ))
       let field_decoder =
         doc.concat([
@@ -638,6 +672,7 @@ fn generate_field_decoder_with_schema(
     type_mapping.IntType -> "decode.int"
     type_mapping.FloatType -> "decode.float"
     type_mapping.BoolType -> "decode.bool"
+    type_mapping.JsonType -> "decode.dynamic"
     type_mapping.DynamicType -> "decode.dynamic"
     type_mapping.ListType(inner) -> {
       let inner_decoder =
@@ -696,6 +731,7 @@ fn generate_field_decoder(gleam_type: type_mapping.GleamType) -> String {
     type_mapping.IntType -> "decode.int"
     type_mapping.FloatType -> "decode.float"
     type_mapping.BoolType -> "decode.bool"
+    type_mapping.JsonType -> "decode.dynamic"
     type_mapping.DynamicType -> "decode.dynamic"
     type_mapping.ListType(inner) ->
       "decode.list(" <> generate_field_decoder(inner) <> ")"
@@ -713,6 +749,7 @@ fn generate_input_type_definition(input_info: InputTypeInfo) -> Document {
       let sanitized_name = sanitize_field_name(input_value.name)
       use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
         input_value.type_ref,
+        type_mapping.InputContext,
       ))
       let field_doc =
         doc.concat([
@@ -749,30 +786,82 @@ fn generate_input_serializer(input_info: InputTypeInfo) -> Document {
       let sanitized_name = sanitize_field_name(input_value.name)
       use gleam_type <- result.try(type_mapping.graphql_to_gleam_nullable(
         input_value.type_ref,
+        type_mapping.InputContext,
       ))
 
-      let value_expr =
-        encode_input_field_value(
-          param_name <> "." <> sanitized_name,
-          gleam_type,
-          input_value.type_ref,
-          input_info.field_types,
-        )
+      // Generate code that wraps optional fields in case/Some/None
+      case gleam_type {
+        type_mapping.OptionType(inner) -> {
+          let inner_encoder =
+            encode_input_field_value(
+              "val",
+              inner,
+              unwrap_option_type(input_value.type_ref),
+              input_info.field_types,
+            )
 
-      Ok(
-        doc.concat([
-          doc.from_string("#("),
-          string_doc(input_value.name),
-          doc.from_string(", "),
-          value_expr,
-          doc.from_string(")"),
-        ]),
-      )
+          Ok(
+            doc.concat([
+              doc.from_string("{"),
+              doc.line,
+              doc.from_string("  case " <> param_name <> "." <> sanitized_name <> " {"),
+              doc.line,
+              doc.from_string("    Some(val) -> Some(#("),
+              string_doc(input_value.name),
+              doc.from_string(", "),
+              inner_encoder,
+              doc.from_string("))"),
+              doc.line,
+              doc.from_string("    None -> None"),
+              doc.line,
+              doc.from_string("  }"),
+              doc.line,
+              doc.from_string("}"),
+            ]),
+          )
+        }
+        _ -> {
+          // Non-optional field: always include
+          let value_expr =
+            encode_input_field_value(
+              param_name <> "." <> sanitized_name,
+              gleam_type,
+              input_value.type_ref,
+              input_info.field_types,
+            )
+
+          Ok(
+            doc.concat([
+              doc.from_string("Some(#("),
+              string_doc(input_value.name),
+              doc.from_string(", "),
+              value_expr,
+              doc.from_string("))"),
+            ]),
+          )
+        }
+      }
     })
     |> list.filter_map(fn(r) { r })
 
   let body =
-    call_doc("json.object", [comma_list("[", field_entries, "]")])
+    doc.concat([
+      comma_list("[", field_entries, "]"),
+      doc.line,
+      doc.from_string("|> list.filter_map(fn(x) {"),
+      doc.line,
+      doc.from_string("  case x {"),
+      doc.line,
+      doc.from_string("    Some(val) -> Ok(val)"),
+      doc.line,
+      doc.from_string("    None -> Error(Nil)"),
+      doc.line,
+      doc.from_string("  }"),
+      doc.line,
+      doc.from_string("})"),
+      doc.line,
+      doc.from_string("|> json.object"),
+    ])
 
   doc.concat([
     doc.from_string("fn " <> serializer_name <> "("),
@@ -798,8 +887,11 @@ fn encode_input_field_value(
       call_doc("json.float", [doc.from_string(field_access)])
     type_mapping.BoolType ->
       call_doc("json.bool", [doc.from_string(field_access)])
+    type_mapping.JsonType ->
+      // JSON scalar: use the json.Json value directly without wrapping
+      doc.from_string(field_access)
     type_mapping.DynamicType ->
-      // Dynamic types in inputs would need custom encoding, use identity for now
+      // This case handles other custom scalars that map to Dynamic
       doc.from_string(field_access)
     type_mapping.ListType(inner) -> {
       let base_type_name = get_base_type_name(type_ref)
@@ -818,6 +910,7 @@ fn encode_input_field_value(
             type_mapping.IntType -> "json.int"
             type_mapping.FloatType -> "json.float"
             type_mapping.BoolType -> "json.bool"
+            type_mapping.JsonType -> "fn(x) { x }"
             _ -> "json.string"
           }
           call_doc("json.array", [
@@ -844,6 +937,7 @@ fn encode_input_field_value(
             type_mapping.IntType -> "json.int"
             type_mapping.FloatType -> "json.float"
             type_mapping.BoolType -> "json.bool"
+            type_mapping.JsonType -> "fn(x) { x }"
             type_mapping.ListType(_) -> {
               // This is handled by recursion, but for now use a lambda
               let of_fn = case inner {
@@ -896,6 +990,7 @@ fn generate_function(
           )
           use gleam_type <- result.try(type_mapping.graphql_to_gleam(
             schema_type_ref,
+            type_mapping.InputContext,
           ))
           let param_name = snake_case(var.name)
           Ok(
@@ -925,6 +1020,7 @@ fn generate_function(
           )
           use gleam_type <- result.try(type_mapping.graphql_to_gleam(
             schema_type_ref,
+            type_mapping.InputContext,
           ))
           let param_name = snake_case(var.name)
           let value_encoder =
@@ -1073,8 +1169,11 @@ fn encode_variable_value(
     type_mapping.FloatType ->
       call_doc("json.float", [doc.from_string(var_name)])
     type_mapping.BoolType -> call_doc("json.bool", [doc.from_string(var_name)])
+    type_mapping.JsonType ->
+      // JSON scalar: use the json.Json value directly without wrapping
+      doc.from_string(var_name)
     type_mapping.DynamicType ->
-      // Dynamic types in variables would need custom encoding
+      // This case handles other custom scalars that map to Dynamic
       doc.from_string(var_name)
     type_mapping.ListType(inner) -> {
       let base_type_name = get_base_type_name(type_ref)
@@ -1093,6 +1192,7 @@ fn encode_variable_value(
             type_mapping.IntType -> "json.int"
             type_mapping.FloatType -> "json.float"
             type_mapping.BoolType -> "json.bool"
+            type_mapping.JsonType -> "fn(x) { x }"
             _ -> "json.string"
           }
           call_doc("json.array", [

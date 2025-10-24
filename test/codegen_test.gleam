@@ -1074,3 +1074,279 @@ pub fn generate_query_with_json_scalar_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate mutation with JSON scalar in InputObject
+pub fn generate_mutation_with_json_input_field_test() {
+  let mutation_source =
+    "
+    mutation UpdateSettings($input: SettingsInput!) {
+      updateSettings(input: $input) {
+        id
+        metadata
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(mutation_source)
+
+  // Define InputObject type with JSON field
+  let settings_input_fields = [
+    schema.InputValue(
+      "metadata",
+      schema.NamedType("JSON", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+  ]
+
+  let settings_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "metadata",
+      schema.NamedType("JSON", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Settings", schema.ObjectType("Settings", settings_fields, None)),
+        #(
+          "SettingsInput",
+          schema.InputObjectType("SettingsInput", settings_input_fields, None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "updateSettings",
+                schema.NamedType("Settings", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "SettingsInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("update_settings", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with JSON scalar in InputObject")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate mutation with optional InputObject fields (tests Some/None serializer)
+pub fn generate_mutation_with_optional_input_fields_test() {
+  let mutation_source =
+    "
+    mutation CreateProfile($input: ProfileInput!) {
+      createProfile(input: $input) {
+        id
+        displayName
+        description
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(mutation_source)
+
+  // Define InputObject type with optional fields (nullable in GraphQL)
+  let profile_input_fields = [
+    schema.InputValue(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "description",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "avatar",
+      schema.NamedType("JSON", schema.Scalar),
+      None,
+    ),
+  ]
+
+  let profile_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+    schema.Field(
+      "description",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Profile", schema.ObjectType("Profile", profile_fields, None)),
+        #(
+          "ProfileInput",
+          schema.InputObjectType("ProfileInput", profile_input_fields, None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "createProfile",
+                schema.NamedType("Profile", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "ProfileInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("create_profile", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(
+        title: "Mutation with optional InputObject fields (imports Some, None)",
+      )
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate query with optional response fields only (should not import Some, None)
+pub fn generate_query_with_optional_response_fields_test() {
+  let query_source =
+    "
+    query GetProfile {
+      profile {
+        id
+        displayName
+        description
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with optional response fields
+  let profile_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+    schema.Field(
+      "description",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Profile", schema.ObjectType("Profile", profile_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "profile",
+                schema.NamedType("Profile", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_profile", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(
+        title: "Query with optional response fields (no Some, None imports)",
+      )
+    }
+    Error(_) -> Nil
+  }
+}

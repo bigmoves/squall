@@ -12,19 +12,23 @@ import gleam/json
 import gleam/list
 import gleam/result
 import squall
-import gleam/option.{type Option}
+import gleam/option.{type Option, Some, None}
 
 pub type BlobInput {
   BlobInput(data: String, mime_type: String)
 }
 
 fn blob_input_to_json(input: BlobInput) -> json.Json {
-  json.object(
-    [
-      #("data", json.string(input.data)),
-      #("mimeType", json.string(input.mime_type)),
-    ],
-  )
+  [Some(#("data", json.string(input.data))), Some(#("mimeType", json.string(
+      input.mime_type,
+    )))]
+  |> list.filter_map(fn(x) {
+    case x {
+      Some(val) -> Ok(val)
+      None -> Error(Nil)
+    }
+  })
+  |> json.object
 }
 
 pub type ProfileInput {
@@ -36,16 +40,29 @@ pub type ProfileInput {
 }
 
 fn profile_input_to_json(input: ProfileInput) -> json.Json {
-  json.object(
-    [
-      #("displayName", json.nullable(input.display_name, json.string)),
-      #("avatar", json.nullable(input.avatar, blob_input_to_json)),
-      #("interests", json.nullable(
-        input.interests,
-        fn(list) { json.array(from: list, of: json.string) },
-      )),
-    ],
-  )
+  [{
+      case input.display_name {
+        Some(val) -> Some(#("displayName", json.string(val)))
+        None -> None
+      }
+    }, {
+      case input.avatar {
+        Some(val) -> Some(#("avatar", blob_input_to_json(val)))
+        None -> None
+      }
+    }, {
+      case input.interests {
+        Some(val) -> Some(#("interests", json.array(from: val, of: json.string)))
+        None -> None
+      }
+    }]
+  |> list.filter_map(fn(x) {
+    case x {
+      Some(val) -> Ok(val)
+      None -> Error(Nil)
+    }
+  })
+  |> json.object
 }
 
 pub type Profile {

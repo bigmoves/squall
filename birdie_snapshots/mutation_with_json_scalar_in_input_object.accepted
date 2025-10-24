@@ -1,8 +1,8 @@
 ---
 version: 1.4.1
-title: Mutation with InputObject variable
+title: Mutation with JSON scalar in InputObject
 file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_input_object_test
+test_name: generate_mutation_with_json_input_field_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -13,20 +13,21 @@ import gleam/list
 import gleam/result
 import squall
 import gleam/option.{type Option, Some, None}
+import gleam/dynamic.{type Dynamic}
 
-pub type ProfileInput {
-  ProfileInput(display_name: Option(String), description: Option(String))
+pub type SettingsInput {
+  SettingsInput(metadata: Option(json.Json), display_name: Option(String))
 }
 
-fn profile_input_to_json(input: ProfileInput) -> json.Json {
+fn settings_input_to_json(input: SettingsInput) -> json.Json {
   [{
-      case input.display_name {
-        Some(val) -> Some(#("displayName", json.string(val)))
+      case input.metadata {
+        Some(val) -> Some(#("metadata", val))
         None -> None
       }
     }, {
-      case input.description {
-        Some(val) -> Some(#("description", json.string(val)))
+      case input.display_name {
+        Some(val) -> Some(#("displayName", json.string(val)))
         None -> None
       }
     }]
@@ -39,30 +40,30 @@ fn profile_input_to_json(input: ProfileInput) -> json.Json {
   |> json.object
 }
 
-pub type Profile {
-  Profile(id: String, display_name: Option(String))
+pub type Settings {
+  Settings(id: String, metadata: Option(Dynamic))
 }
 
-pub fn profile_decoder() -> decode.Decoder(Profile) {
+pub fn settings_decoder() -> decode.Decoder(Settings) {
   use id <- decode.field("id", decode.string)
-  use display_name <- decode.field("displayName", decode.optional(decode.string))
-  decode.success(Profile(id: id, display_name: display_name))
+  use metadata <- decode.field("metadata", decode.optional(decode.dynamic))
+  decode.success(Settings(id: id, metadata: metadata))
 }
 
-pub type UpdateProfileResponse {
-  UpdateProfileResponse(update_profile: Option(Profile))
+pub type UpdateSettingsResponse {
+  UpdateSettingsResponse(update_settings: Option(Settings))
 }
 
-pub fn update_profile_response_decoder() -> decode.Decoder(UpdateProfileResponse) {
-  use update_profile <- decode.field("updateProfile", decode.optional(profile_decoder()))
-  decode.success(UpdateProfileResponse(update_profile: update_profile))
+pub fn update_settings_response_decoder() -> decode.Decoder(UpdateSettingsResponse) {
+  use update_settings <- decode.field("updateSettings", decode.optional(settings_decoder()))
+  decode.success(UpdateSettingsResponse(update_settings: update_settings))
 }
 
-pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(UpdateProfileResponse, String) {
+pub fn update_settings(client: squall.Client, input: SettingsInput) -> Result(UpdateSettingsResponse, String) {
   let query =
-    "mutation UpdateProfile($input: ProfileInput!) { updateProfile(input: $input) { id displayName } }"
+    "mutation UpdateSettings($input: SettingsInput!) { updateSettings(input: $input) { id metadata } }"
   let variables =
-    json.object([#("input", profile_input_to_json(input))])
+    json.object([#("input", settings_input_to_json(input))])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(
@@ -87,7 +88,7 @@ pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(Upda
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
   let data_and_response_decoder = {
-    use data <- decode.field("data", update_profile_response_decoder())
+    use data <- decode.field("data", update_settings_response_decoder())
     decode.success(data)
   }
   decode.run(json_value, data_and_response_decoder)

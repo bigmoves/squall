@@ -1,8 +1,8 @@
 ---
 version: 1.4.1
-title: Query with JSON scalar field
+title: Query with optional response fields (no Some, None imports)
 file: ./test/codegen_test.gleam
-test_name: generate_query_with_json_scalar_test
+test_name: generate_query_with_optional_response_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -13,17 +13,20 @@ import gleam/list
 import gleam/result
 import squall
 import gleam/option.{type Option}
-import gleam/dynamic.{type Dynamic}
 
 pub type Profile {
-  Profile(id: String, display_name: Option(String), metadata: Option(Dynamic))
+  Profile(id: String, display_name: Option(String), description: Option(String))
 }
 
 pub fn profile_decoder() -> decode.Decoder(Profile) {
   use id <- decode.field("id", decode.string)
   use display_name <- decode.field("displayName", decode.optional(decode.string))
-  use metadata <- decode.field("metadata", decode.optional(decode.dynamic))
-  decode.success(Profile(id: id, display_name: display_name, metadata: metadata))
+  use description <- decode.field("description", decode.optional(decode.string))
+  decode.success(Profile(
+    id: id,
+    display_name: display_name,
+    description: description,
+  ))
 }
 
 pub type GetProfileResponse {
@@ -37,7 +40,7 @@ pub fn get_profile_response_decoder() -> decode.Decoder(GetProfileResponse) {
 
 pub fn get_profile(client: squall.Client) -> Result(GetProfileResponse, String) {
   let query =
-    "query GetProfile { profile { id displayName metadata } }"
+    "query GetProfile { profile { id displayName description } }"
   let variables =
     json.object([])
   let body =
