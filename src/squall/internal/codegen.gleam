@@ -120,21 +120,57 @@ fn sanitize_field_name(name: String) -> String {
   }
 }
 
-/// Generate imports section
-fn imports_doc() -> Document {
-  let import_lines = [
+/// Recursively detect if Option types are used
+fn detect_option_usage_in_gleam_type(
+  gleam_type: type_mapping.GleamType,
+) -> Bool {
+  case gleam_type {
+    type_mapping.StringType
+    | type_mapping.IntType
+    | type_mapping.FloatType
+    | type_mapping.BoolType
+    | type_mapping.CustomType(_) -> False
+    type_mapping.ListType(inner) -> detect_option_usage_in_gleam_type(inner)
+    type_mapping.OptionType(_inner) -> True
+  }
+}
+
+/// Detect if Option types are used in any field
+fn detect_option_usage(fields: List(#(String, schema.TypeRef))) -> Bool {
+  fields
+  |> list.fold(False, fn(acc, field) {
+    let #(_field_name, type_ref) = field
+
+    // Convert to GleamType
+    case type_mapping.graphql_to_gleam_nullable(type_ref) {
+      Ok(gleam_type) -> {
+        let needs_option = detect_option_usage_in_gleam_type(gleam_type)
+        acc || needs_option
+      }
+      Error(_) -> acc
+    }
+  })
+}
+
+/// Generate imports section with conditional Option import
+fn imports_doc(needs_option: Bool) -> Document {
+  let core_imports = [
     "import gleam/dynamic/decode",
     "import gleam/http",
     "import gleam/http/request",
     "import gleam/httpc",
     "import gleam/json",
     "import gleam/list",
-    "import gleam/option.{type Option}",
     "import gleam/result",
     "import squall",
   ]
 
-  import_lines
+  let optional_imports = case needs_option {
+    True -> ["import gleam/option.{type Option}"]
+    False -> []
+  }
+
+  list.append(core_imports, optional_imports)
   |> list.map(doc.from_string)
   |> doc.join(with: doc.line)
 }
@@ -232,8 +268,22 @@ pub fn generate_operation(
       schema_data.types,
     )
 
+  // Detect Option type usage from all field types
+  // Collect all field types: response, nested, input, and variables
+  let all_field_types =
+    list.flatten([
+      field_types,
+      list.flat_map(nested_types, fn(nt) { nt.fields }),
+      list.flat_map(input_types, fn(it) {
+        it.input_fields
+        |> list.map(fn(iv) { #(iv.name, iv.type_ref) })
+      }),
+    ])
+
+  let needs_option = detect_option_usage(all_field_types)
+
   // Build imports
-  let imports = imports_doc()
+  let imports = imports_doc(needs_option)
 
   // Combine all code using doc combinators
   // Order: imports, input types, nested types, response type, response decoder, function

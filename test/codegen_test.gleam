@@ -931,3 +931,77 @@ pub fn generate_mutation_with_nested_input_object_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate query with all non-nullable fields (no Option import needed)
+pub fn generate_query_with_all_non_nullable_fields_test() {
+  let query_source =
+    "
+    query GetProduct {
+      product {
+        id
+        name
+        price
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with all non-nullable fields
+  let product_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "price",
+      schema.NonNullType(schema.NamedType("Float", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Product", schema.ObjectType("Product", product_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "product",
+                schema.NonNullType(schema.NamedType("Product", schema.Object)),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_product", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with all non-nullable fields (no Option import)")
+    }
+    Error(_) -> Nil
+  }
+}
