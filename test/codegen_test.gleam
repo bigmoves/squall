@@ -1005,3 +1005,72 @@ pub fn generate_query_with_all_non_nullable_fields_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate query with JSON scalar field
+pub fn generate_query_with_json_scalar_test() {
+  let query_source =
+    "
+    query GetProfile {
+      profile {
+        id
+        displayName
+        metadata
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with JSON scalar field
+  let profile_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "displayName",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+    schema.Field("metadata", schema.NamedType("JSON", schema.Scalar), [], None),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Profile", schema.ObjectType("Profile", profile_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "profile",
+                schema.NamedType("Profile", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_profile", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with JSON scalar field")
+    }
+    Error(_) -> Nil
+  }
+}

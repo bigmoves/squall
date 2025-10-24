@@ -11,6 +11,7 @@ pub type GleamType {
   IntType
   FloatType
   BoolType
+  DynamicType
   ListType(inner: GleamType)
   OptionType(inner: GleamType)
   CustomType(name: String)
@@ -62,6 +63,7 @@ fn map_scalar_type(name: String) -> Result(GleamType, Error) {
     "Float" -> Ok(FloatType)
     "Boolean" -> Ok(BoolType)
     "ID" -> Ok(StringType)
+    "JSON" -> Ok(DynamicType)
     // Unknown scalars default to String
     _ -> Ok(StringType)
   }
@@ -150,6 +152,13 @@ pub fn is_bool_type(gleam_type: GleamType) -> Bool {
   }
 }
 
+pub fn is_dynamic_type(gleam_type: GleamType) -> Bool {
+  case gleam_type {
+    DynamicType -> True
+    _ -> False
+  }
+}
+
 pub fn is_list_type(gleam_type: GleamType) -> Bool {
   case gleam_type {
     ListType(_) -> True
@@ -185,6 +194,7 @@ pub fn to_gleam_type_string(gleam_type: GleamType) -> String {
     IntType -> "Int"
     FloatType -> "Float"
     BoolType -> "Bool"
+    DynamicType -> "Dynamic"
     ListType(inner) -> "List(" <> to_gleam_type_string(inner) <> ")"
     OptionType(inner) -> "Option(" <> to_gleam_type_string(inner) <> ")"
     CustomType(name) -> name

@@ -158,3 +158,51 @@ pub fn unsupported_scalar_test() {
   // Should map unknown scalars to String by default
   should.be_ok(result)
 }
+
+// Test: Map GraphQL JSON scalar to Gleam Dynamic
+pub fn map_json_type_test() {
+  let graphql_type = schema.NamedType("JSON", schema.Scalar)
+  let result = type_mapping.graphql_to_gleam(graphql_type)
+
+  should.be_ok(result)
+  let assert Ok(gleam_type) = result
+
+  type_mapping.is_dynamic_type(gleam_type)
+  |> should.be_true()
+}
+
+// Test: Map nullable JSON to Option(Dynamic)
+pub fn map_nullable_json_test() {
+  let graphql_type = schema.NamedType("JSON", schema.Scalar)
+  let result = type_mapping.graphql_to_gleam_nullable(graphql_type)
+
+  should.be_ok(result)
+  let assert Ok(gleam_type) = result
+
+  type_mapping.is_option_type(gleam_type)
+  |> should.be_true()
+}
+
+// Test: Map NonNull JSON to Dynamic (not Option)
+pub fn map_non_null_json_test() {
+  let inner = schema.NamedType("JSON", schema.Scalar)
+  let graphql_type = schema.NonNullType(inner)
+  let result = type_mapping.graphql_to_gleam(graphql_type)
+
+  should.be_ok(result)
+  let assert Ok(gleam_type) = result
+
+  type_mapping.is_dynamic_type(gleam_type)
+  |> should.be_true()
+
+  type_mapping.is_option_type(gleam_type)
+  |> should.be_false()
+}
+
+// Test: to_gleam_type_string for DynamicType
+pub fn dynamic_type_string_test() {
+  let gleam_type = type_mapping.DynamicType
+  let type_string = type_mapping.to_gleam_type_string(gleam_type)
+
+  should.equal(type_string, "Dynamic")
+}
