@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Mutation with nested InputObject types
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_with_nested_input_object_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -8,9 +10,9 @@ import gleam/http/request
 import gleam/httpc
 import gleam/json
 import gleam/list
-import gleam/option.{type Option}
 import gleam/result
 import squall
+import gleam/option.{type Option}
 
 pub type BlobInput {
   BlobInput(data: String, mime_type: String)

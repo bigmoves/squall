@@ -10,9 +10,9 @@ import gleam/http/request
 import gleam/httpc
 import gleam/json
 import gleam/list
-import gleam/option.{type Option}
 import gleam/result
 import squall
+import gleam/option.{type Option}
 
 pub type User {
   User(id: String, name: String)

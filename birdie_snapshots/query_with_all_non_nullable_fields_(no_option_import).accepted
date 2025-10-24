@@ -1,8 +1,8 @@
 ---
 version: 1.4.1
-title: Simple query function generation
+title: Query with all non-nullable fields (no Option import)
 file: ./test/codegen_test.gleam
-test_name: generate_simple_query_test
+test_name: generate_query_with_all_non_nullable_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -12,30 +12,30 @@ import gleam/json
 import gleam/list
 import gleam/result
 import squall
-import gleam/option.{type Option}
 
-pub type User {
-  User(id: String, name: Option(String))
+pub type Product {
+  Product(id: String, name: String, price: Float)
 }
 
-pub fn user_decoder() -> decode.Decoder(User) {
+pub fn product_decoder() -> decode.Decoder(Product) {
   use id <- decode.field("id", decode.string)
-  use name <- decode.field("name", decode.optional(decode.string))
-  decode.success(User(id: id, name: name))
+  use name <- decode.field("name", decode.string)
+  use price <- decode.field("price", decode.float)
+  decode.success(Product(id: id, name: name, price: price))
 }
 
-pub type GetUserResponse {
-  GetUserResponse(user: Option(User))
+pub type GetProductResponse {
+  GetProductResponse(product: Product)
 }
 
-pub fn get_user_response_decoder() -> decode.Decoder(GetUserResponse) {
-  use user <- decode.field("user", decode.optional(user_decoder()))
-  decode.success(GetUserResponse(user: user))
+pub fn get_product_response_decoder() -> decode.Decoder(GetProductResponse) {
+  use product <- decode.field("product", product_decoder())
+  decode.success(GetProductResponse(product: product))
 }
 
-pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {
+pub fn get_product(client: squall.Client) -> Result(GetProductResponse, String) {
   let query =
-    "query GetUser { user { id name } }"
+    "query GetProduct { product { id name price } }"
   let variables =
     json.object([])
   let body =
@@ -62,7 +62,7 @@ pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
   let data_and_response_decoder = {
-    use data <- decode.field("data", get_user_response_decoder())
+    use data <- decode.field("data", get_product_response_decoder())
     decode.success(data)
   }
   decode.run(json_value, data_and_response_decoder)
