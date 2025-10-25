@@ -1,10 +1,5 @@
 import gleam/dynamic/decode
-import gleam/http
-import gleam/http/request
-import gleam/httpc
 import gleam/json
-import gleam/list
-import gleam/result
 import squall
 import gleam/option.{type Option}
 
@@ -73,38 +68,11 @@ pub fn get_characters_response_to_json(input: GetCharactersResponse) -> json.Jso
   )
 }
 
-pub fn get_characters(client: squall.Client) -> Result(GetCharactersResponse, String) {
-  let query =
-    "query GetCharacters { characters { results { id name status species } } }"
-  let variables =
-    json.object([])
-  let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
-  use req <- result.try(
-    request.to(client.endpoint)
-    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+pub fn get_characters(client: squall.Client) {
+  squall.execute_query(
+    client,
+    "query GetCharacters { characters { results { id name status species } } }",
+    json.object([]),
+    get_characters_response_decoder(),
   )
-  let req =
-    req
-    |> request.set_method(http.Post)
-    |> request.set_body(json.to_string(body))
-    |> request.set_header("content-type", "application/json")
-  let req =
-    list.fold(client.headers, req, fn(r, header) {
-      request.set_header(r, header.0, header.1)
-    })
-  use resp <- result.try(
-    httpc.send(req)
-    |> result.map_error(fn(_) { "HTTP request failed" }),
-  )
-  use json_value <- result.try(
-    json.parse(from: resp.body, using: decode.dynamic)
-    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
-  )
-  let data_and_response_decoder = {
-    use data <- decode.field("data", get_characters_response_decoder())
-    decode.success(data)
-  }
-  decode.run(json_value, data_and_response_decoder)
-  |> result.map_error(fn(_) { "Failed to decode response data" })
 }

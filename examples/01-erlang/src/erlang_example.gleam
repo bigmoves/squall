@@ -5,10 +5,11 @@ import graphql/multi_query
 import squall
 
 pub fn main() {
-  io.println("Squall Multi-Field Query Example")
-  io.println("=================================\n")
+  io.println("Squall Multi-Field Query Example (Erlang)")
+  io.println("==========================================\n")
 
-  let client = squall.new_client("https://rickandmortyapi.com/graphql", [])
+  // Create an Erlang client (uses gleam_httpc for HTTP requests)
+  let client = squall.new_erlang_client("https://rickandmortyapi.com/graphql", [])
 
   let result = multi_query.multi_query(client)
 

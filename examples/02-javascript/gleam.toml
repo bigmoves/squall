@@ -1,0 +1,14 @@
+name = "javascript_example"
+version = "0.1.0"
+description = "Squall JavaScript example - Rick and Morty GraphQL API"
+target = "javascript"
+
+[dependencies]
+gleam_stdlib = ">= 0.65.0 and < 0.66.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_http = ">= 4.3.0 and < 5.0.0"
+gleam_javascript = ">= 0.3.0 and < 2.0.0"
+squall = { path = "../.." }
+
+[javascript]
+runtime = "node"

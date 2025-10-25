@@ -1,14 +1,11 @@
 ---
 version: 1.4.1
 title: Mutation function generation
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_test
 ---
 import gleam/dynamic/decode
-import gleam/http
-import gleam/http/request
-import gleam/httpc
 import gleam/json
-import gleam/list
-import gleam/result
 import squall
 import gleam/option.{type Option}
 
@@ -44,39 +41,12 @@ pub fn create_user_response_to_json(input: CreateUserResponse) -> json.Json {
   json.object([#("createUser", json.nullable(input.create_user, user_to_json))])
 }
 
-pub fn create_user(client: squall.Client, name: String) -> Result(CreateUserResponse, String) {
-  let query =
-    "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }"
-  let variables =
-    json.object([#("name", json.string(name))])
-  let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
-  use req <- result.try(
-    request.to(client.endpoint)
-    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+pub fn create_user(client: squall.Client, name: String) {
+  squall.execute_query(
+    client,
+    "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }",
+    json.object([#("name", json.string(name))]),
+    create_user_response_decoder(),
   )
-  let req =
-    req
-    |> request.set_method(http.Post)
-    |> request.set_body(json.to_string(body))
-    |> request.set_header("content-type", "application/json")
-  let req =
-    list.fold(client.headers, req, fn(r, header) {
-      request.set_header(r, header.0, header.1)
-    })
-  use resp <- result.try(
-    httpc.send(req)
-    |> result.map_error(fn(_) { "HTTP request failed" }),
-  )
-  use json_value <- result.try(
-    json.parse(from: resp.body, using: decode.dynamic)
-    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
-  )
-  let data_and_response_decoder = {
-    use data <- decode.field("data", create_user_response_decoder())
-    decode.success(data)
-  }
-  decode.run(json_value, data_and_response_decoder)
-  |> result.map_error(fn(_) { "Failed to decode response data" })
 }
 

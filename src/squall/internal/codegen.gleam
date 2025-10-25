@@ -90,16 +90,6 @@ fn block(body: List(Document)) -> Document {
   |> doc.concat
 }
 
-/// A pretty printed let assignment.
-fn let_var(name: String, body: Document) -> Document {
-  doc.group(
-    doc.concat([
-      doc.from_string("let " <> name <> " ="),
-      doc.nest(doc.concat([doc.line, body]), by: indent),
-    ]),
-  )
-}
-
 /// A pretty printed Gleam string with proper escaping.
 fn string_doc(content: String) -> Document {
   let escaped_string =
@@ -218,14 +208,10 @@ fn imports_doc(
   needs_dynamic: Bool,
   needs_option_constructors: Bool,
 ) -> Document {
+  // Minimal imports - just what we need for decoders and the squall client
   let core_imports = [
     "import gleam/dynamic/decode",
-    "import gleam/http",
-    "import gleam/http/request",
-    "import gleam/httpc",
     "import gleam/json",
-    "import gleam/list",
-    "import gleam/result",
     "import squall",
   ]
 
@@ -1260,129 +1246,22 @@ fn generate_function(
     }
   }
 
-  // Build function body
-  let body_docs = [
-    let_var("query", string_doc(query_string)),
-    let_var("variables", variables_code),
-    let_var(
-      "body",
-      call_doc("json.object", [
-        comma_list(
-          "[",
-          [
-            doc.from_string("#(\"query\", json.string(query))"),
-            doc.from_string("#(\"variables\", variables)"),
-          ],
-          "]",
-        ),
-      ]),
-    ),
-    doc.concat([
-      doc.from_string("use req <- result.try("),
-      doc.concat([
-        doc.line,
-        call_doc("request.to", [doc.from_string("client.endpoint")]),
-        doc.line,
-        doc.from_string(
-          "|> result.map_error(fn(_) { \"Invalid endpoint URL\" }),",
-        ),
-      ])
-        |> doc.nest(by: indent),
-      doc.line,
-      doc.from_string(")"),
-    ]),
-    let_var(
-      "req",
-      doc.concat([
-        doc.from_string("req"),
-        doc.line,
-        doc.from_string("|> request.set_method(http.Post)"),
-        doc.line,
-        doc.from_string("|> request.set_body(json.to_string(body))"),
-        doc.line,
-        doc.from_string(
-          "|> request.set_header(\"content-type\", \"application/json\")",
-        ),
-      ]),
-    ),
-    let_var(
-      "req",
-      doc.concat([
-        doc.from_string("list.fold(client.headers, req, fn(r, header) {"),
-        doc.line,
-        doc.from_string("  request.set_header(r, header.0, header.1)"),
-        doc.line,
-        doc.from_string("})"),
-      ]),
-    ),
-    doc.concat([
-      doc.from_string("use resp <- result.try("),
-      doc.concat([
-        doc.line,
-        call_doc("httpc.send", [doc.from_string("req")]),
-        doc.line,
-        doc.from_string(
-          "|> result.map_error(fn(_) { \"HTTP request failed\" }),",
-        ),
-      ])
-        |> doc.nest(by: indent),
-      doc.line,
-      doc.from_string(")"),
-    ]),
-    doc.concat([
-      doc.from_string("use json_value <- result.try("),
-      doc.concat([
-        doc.line,
-        call_doc("json.parse", [
-          doc.from_string("from: resp.body"),
-          doc.from_string("using: decode.dynamic"),
-        ]),
-        doc.line,
-        doc.from_string(
-          "|> result.map_error(fn(_) { \"Failed to decode JSON response\" }),",
-        ),
-      ])
-        |> doc.nest(by: indent),
-      doc.line,
-      doc.from_string(")"),
-    ]),
-    doc.concat([
-      doc.from_string("let data_and_response_decoder = {"),
-      doc.line |> doc.nest(by: indent),
-      doc.concat([
-        doc.from_string(
-          "use data <- decode.field(\"data\", "
-          <> snake_case(response_type_name)
-          <> "_decoder())",
-        ),
-        doc.line,
-        doc.from_string("decode.success(data)"),
-      ])
-        |> doc.nest(by: indent),
-      doc.line,
-      doc.from_string("}"),
-    ]),
-    doc.concat([
-      doc.from_string("decode.run(json_value, data_and_response_decoder)"),
-      doc.line,
-      doc.from_string(
-        "|> result.map_error(fn(_) { \"Failed to decode response data\" })",
-      ),
-    ]),
-  ]
+  // Build simplified function body that just calls squall.execute_query
+  let body_doc =
+    call_doc("squall.execute_query", [
+      doc.from_string("client"),
+      string_doc(query_string),
+      variables_code,
+      doc.from_string(snake_case(response_type_name) <> "_decoder()"),
+    ])
 
   // Build function signature
-  // Don't use call_doc for return type to prevent it from breaking before parameters
-  let return_type =
-    doc.from_string("Result(" <> response_type_name <> ", String)")
-
+  // The return type is handled by squall.execute_query (Promise on JS, Result on Erlang)
   doc.concat([
     doc.from_string("pub fn " <> function_name),
     comma_list("(", param_docs, ")"),
-    doc.from_string(" -> "),
-    return_type,
     doc.from_string(" "),
-    block(body_docs),
+    block([body_doc]),
   ])
 }
 
