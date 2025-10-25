@@ -9,6 +9,7 @@ import gleam/json
 import squall
 import gleam/option.{type Option, Some, None}
 import gleam/dynamic.{type Dynamic}
+import gleam/list
 
 pub type SettingsInput {
   SettingsInput(metadata: Option(json.Json), display_name: Option(String))

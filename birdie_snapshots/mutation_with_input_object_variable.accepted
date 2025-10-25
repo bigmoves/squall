@@ -8,6 +8,7 @@ import gleam/dynamic/decode
 import gleam/json
 import squall
 import gleam/option.{type Option, Some, None}
+import gleam/list
 
 pub type ProfileInput {
   ProfileInput(display_name: Option(String), description: Option(String))
