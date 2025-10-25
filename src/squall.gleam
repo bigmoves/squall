@@ -57,9 +57,9 @@ pub fn new_client_with_auth(
   )
 }
 
+@target(erlang)
 /// Create a new Erlang GraphQL client with custom headers.
 /// This uses the Erlang HTTP adapter (gleam_httpc).
-@target(erlang)
 pub fn new_erlang_client(
   endpoint: String,
   headers: List(#(String, String)),
@@ -67,8 +67,8 @@ pub fn new_erlang_client(
   Client(endpoint: endpoint, headers: headers, send_request: erlang.adapter())
 }
 
-/// Create a new Erlang GraphQL client with bearer token authentication.
 @target(erlang)
+/// Create a new Erlang GraphQL client with bearer token authentication.
 pub fn new_erlang_client_with_auth(endpoint: String, token: String) -> Client {
   Client(
     endpoint: endpoint,
@@ -77,19 +77,26 @@ pub fn new_erlang_client_with_auth(endpoint: String, token: String) -> Client {
   )
 }
 
+@target(javascript)
 /// Create a new JavaScript GraphQL client with custom headers.
 /// This uses the JavaScript HTTP adapter (Fetch API).
-@target(javascript)
 pub fn new_javascript_client(
   endpoint: String,
   headers: List(#(String, String)),
 ) -> Client {
-  Client(endpoint: endpoint, headers: headers, send_request: javascript.adapter())
+  Client(
+    endpoint: endpoint,
+    headers: headers,
+    send_request: javascript.adapter(),
+  )
 }
 
-/// Create a new JavaScript GraphQL client with bearer token authentication.
 @target(javascript)
-pub fn new_javascript_client_with_auth(endpoint: String, token: String) -> Client {
+/// Create a new JavaScript GraphQL client with bearer token authentication.
+pub fn new_javascript_client_with_auth(
+  endpoint: String,
+  token: String,
+) -> Client {
   Client(
     endpoint: endpoint,
     headers: [#("Authorization", "Bearer " <> token)],
@@ -97,9 +104,9 @@ pub fn new_javascript_client_with_auth(endpoint: String, token: String) -> Clien
   )
 }
 
+@target(javascript)
 /// Execute a GraphQL query on JavaScript targets.
 /// Returns a Promise that resolves to a Result containing the decoded response.
-@target(javascript)
 pub fn execute_query(
   client: Client,
   query: String,
@@ -157,9 +164,9 @@ pub fn execute_query(
   }
 }
 
+@target(erlang)
 /// Execute a GraphQL query on Erlang targets.
 /// Returns a Result containing the decoded response.
-@target(erlang)
 pub fn execute_query(
   client: Client,
   query: String,

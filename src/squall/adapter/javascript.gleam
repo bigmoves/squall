@@ -16,7 +16,9 @@ import squall/adapter
 /// This adapter works on both browser and Node.js JavaScript targets.
 /// Returns a Promise that resolves to a Result.
 pub fn adapter() -> adapter.HttpAdapter {
-  fn(req: request.Request(String)) -> Promise(Result(response.Response(String), String)) {
+  fn(req: request.Request(String)) -> Promise(
+    Result(response.Response(String), String),
+  ) {
     fetch.send(req)
     |> promise.try_await(fetch.read_text_body)
     |> promise.map(result.map_error(_, fn(_) { "HTTP request failed" }))

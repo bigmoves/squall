@@ -1424,18 +1424,8 @@ pub fn generate_response_serializer_with_optional_fields_test() {
       [],
       None,
     ),
-    schema.Field(
-      "name",
-      schema.NamedType("String", schema.Scalar),
-      [],
-      None,
-    ),
-    schema.Field(
-      "email",
-      schema.NamedType("String", schema.Scalar),
-      [],
-      None,
-    ),
+    schema.Field("name", schema.NamedType("String", schema.Scalar), [], None),
+    schema.Field("email", schema.NamedType("String", schema.Scalar), [], None),
   ]
 
   let mock_schema =
@@ -1495,18 +1485,8 @@ pub fn generate_response_serializer_with_nested_types_test() {
 
   // Create mock schema with nested types
   let location_fields = [
-    schema.Field(
-      "city",
-      schema.NamedType("String", schema.Scalar),
-      [],
-      None,
-    ),
-    schema.Field(
-      "country",
-      schema.NamedType("String", schema.Scalar),
-      [],
-      None,
-    ),
+    schema.Field("city", schema.NamedType("String", schema.Scalar), [], None),
+    schema.Field("country", schema.NamedType("String", schema.Scalar), [], None),
   ]
 
   let user_fields = [
@@ -1685,12 +1665,7 @@ pub fn generate_response_serializer_with_all_scalars_test() {
       [],
       None,
     ),
-    schema.Field(
-      "metadata",
-      schema.NamedType("JSON", schema.Scalar),
-      [],
-      None,
-    ),
+    schema.Field("metadata", schema.NamedType("JSON", schema.Scalar), [], None),
   ]
 
   let mock_schema =
