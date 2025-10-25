@@ -1118,7 +1118,8 @@ fn encode_response_field_value(
               }
             }
           }
-          let inner_encoder = "fn(list) { json.array(from: list, of: " <> of_fn <> ") }"
+          let inner_encoder =
+            "fn(list) { json.array(from: list, of: " <> of_fn <> ") }"
           call_doc("json.nullable", [
             doc.from_string(field_access),
             doc.from_string(inner_encoder),
@@ -1158,7 +1159,9 @@ fn encode_response_field_value(
       // This is an Object type
       case dict.get(schema_types, name) {
         Ok(schema.ObjectType(_, _, _)) ->
-          call_doc(snake_case(name) <> "_to_json", [doc.from_string(field_access)])
+          call_doc(snake_case(name) <> "_to_json", [
+            doc.from_string(field_access),
+          ])
         _ ->
           // Fallback to string if not an object type
           call_doc("json.string", [doc.from_string(field_access)])
