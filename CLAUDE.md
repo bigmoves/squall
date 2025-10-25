@@ -10,19 +10,26 @@
 
 1. **Convention over Configuration**: No config files, just drop `.gql` files in the right place
 2. **Type Safety First**: All generated code is fully typed based on GraphQL schema
-3. **Test-Driven Development**: Every feature has tests written first
-4. **Modular Design**: Clear separation of concerns across modules
+3. **Isomorphic by Design**: Generated client code works on any Gleam target (Erlang, JavaScript/Browser, JavaScript/Node)
+4. **Test-Driven Development**: Every feature has tests written first
+5. **Modular Design**: Clear separation of concerns across modules
 
 ### Module Breakdown
 
 ```
-src/squall/internal/
-├── error.gleam           # Comprehensive error types
-├── discovery.gleam       # File discovery and validation
-├── parser.gleam          # GraphQL lexer + recursive descent parser
-├── schema.gleam          # GraphQL schema introspection
-├── type_mapping.gleam    # GraphQL to Gleam type conversion
-└── codegen.gleam         # Code generation with glam
+src/squall/
+├── squall.gleam          # Public API & Client type
+├── adapter.gleam         # HTTP adapter interface
+├── adapter/
+│   ├── erlang.gleam      # Erlang HTTP adapter (uses gleam_httpc)
+│   └── javascript.gleam  # JavaScript HTTP adapter (uses Fetch API)
+└── internal/
+    ├── error.gleam           # Comprehensive error types
+    ├── discovery.gleam       # File discovery and validation
+    ├── parser.gleam          # GraphQL lexer + recursive descent parser
+    ├── schema.gleam          # GraphQL schema introspection
+    ├── type_mapping.gleam    # GraphQL to Gleam type conversion
+    └── codegen.gleam         # Code generation with glam
 ```
 
 ### Data Flow
@@ -51,7 +58,35 @@ GraphQL types map to Gleam types:
 - `[Type]` → `List(Type)`
 - Custom objects → Custom Gleam types
 
-### 3. Testing Strategy
+### 3. HTTP Adapter Pattern
+
+**Why Adapters?**
+To make generated code isomorphic (work across Gleam targets), Squall uses an adapter pattern for HTTP requests:
+
+- **`squall.Client`** contains a `send_request: HttpAdapter` field
+- **`HttpAdapter`** is a function type: `fn(Request(String)) -> Result(Response(String), String)`
+- **Platform-specific adapters**:
+  - `squall/adapter/erlang.gleam` - Uses `gleam_httpc` for Erlang target
+  - `squall/adapter/javascript.gleam` - Uses Fetch API for JavaScript targets (browser/Node)
+- **Generated code** calls `client.send_request(req)` instead of directly using `httpc`
+
+**Usage Example:**
+```gleam
+// Erlang target
+import squall
+let client = squall.new_erlang_client("https://api.example.com/graphql", [])
+
+// JavaScript target
+import squall
+let client = squall.new_javascript_client("https://api.example.com/graphql", [])
+
+// Generic (with explicit adapter)
+import squall
+import squall/adapter/erlang
+let client = squall.new_client("https://api.example.com/graphql", [], erlang.adapter())
+```
+
+### 4. Testing Strategy
 
 **TDD Approach:**
 1. Write test first (in `test/` directory)
@@ -65,12 +100,15 @@ GraphQL types map to Gleam types:
 - **Snapshot tests**: Using `birdie` for code generation validation
 - **Integration tests**: Test file embedded in `test/fixtures/graphql/`
 
-### 4. Code Generation
+### 5. Code Generation
 
 Uses the `glam` library for pretty-printing. Generated code includes:
-- Type definitions (custom types for responses)
+- Type definitions (custom types for responses and inputs)
 - JSON decoders (using `gleam/dynamic`)
-- HTTP client functions (using `gleam_http` + `gleam_httpc`)
+- JSON serializers (for converting types back to JSON)
+- HTTP client functions (using `squall.Client` with adapter pattern)
+
+**Key Feature**: Generated code does NOT directly import `gleam_httpc` or any platform-specific HTTP library. Instead, it uses `client.send_request()`, making it work across all Gleam targets.
 
 ## File Conventions
 
@@ -192,13 +230,26 @@ Example: Adding fragment support
 3. **Review the diff** to ensure it's correct
 4. **Accept snapshots**: `BIRDIE_ACCEPT=1 gleam test`
 
+## Isomorphic Architecture Benefits
+
+✅ **Achieved:**
+- Generated client code works on Erlang, JavaScript/Browser, and JavaScript/Node
+- No platform-specific imports in generated code
+- Users can easily create custom adapters for other HTTP libraries
+- Generator (CLI) remains Erlang-only (appropriate for build tools)
+
+🎯 **How It Works:**
+1. **Generation Time**: CLI runs on Erlang, uses `gleam_httpc` for schema introspection
+2. **Runtime**: Generated code uses `squall.Client` with platform-specific adapter
+3. **User Code**: Chooses adapter based on target (Erlang vs JavaScript)
+
 ## Known Limitations
 
-1. **HTTP Client**: Currently returns an error - needs full implementation
-2. **Fragments**: Not yet implemented
-3. **Directives**: Not yet handled (@include, @skip, etc.)
-4. **Custom Scalars**: All map to String by default
-5. **Introspection**: Doesn't handle deeply nested types beyond 5 levels
+1. **Fragments**: Not yet implemented
+2. **Directives**: Not yet handled (@include, @skip, etc.)
+3. **Custom Scalars**: Most map to String by default (except JSON which maps to `json.Json`)
+4. **Introspection**: Doesn't handle deeply nested types beyond 5 levels
+5. **JavaScript FFI**: Fetch adapter requires testing on actual JavaScript runtime
 
 ## Code Style
 
@@ -241,10 +292,10 @@ Example: Adding fragment support
 
 ### High Priority
 
-- [ ] Implement full HTTP client (replace stub in `make_graphql_request`)
+- [ ] Test JavaScript adapter on actual JavaScript runtime (browser & Node.js)
 - [ ] Add fragment support
 - [ ] Handle GraphQL directives
-- [ ] Custom scalar type mapping
+- [ ] Custom scalar type mapping with user configuration
 
 ### Medium Priority
 
@@ -252,6 +303,7 @@ Example: Adding fragment support
 - [ ] Watch mode for development
 - [ ] Better error messages with source code snippets
 - [ ] Cache schema introspection results
+- [ ] WebSocket adapter for subscriptions
 
 ### Low Priority
 

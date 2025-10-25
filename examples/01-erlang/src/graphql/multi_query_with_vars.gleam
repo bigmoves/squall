@@ -1,10 +1,5 @@
 import gleam/dynamic/decode
-import gleam/http
-import gleam/http/request
-import gleam/httpc
 import gleam/json
-import gleam/list
-import gleam/result
 import squall
 import gleam/option.{type Option}
 
@@ -37,21 +32,23 @@ pub fn character_decoder() -> decode.Decoder(Character) {
 }
 
 pub type Location {
-  Location(id: Option(String))
+  Location(id: Option(String), name: Option(String))
 }
 
 pub fn location_decoder() -> decode.Decoder(Location) {
   use id <- decode.field("id", decode.optional(decode.string))
-  decode.success(Location(id: id))
+  use name <- decode.field("name", decode.optional(decode.string))
+  decode.success(Location(id: id, name: name))
 }
 
 pub type Episode {
-  Episode(id: Option(String))
+  Episode(id: Option(String), name: Option(String))
 }
 
 pub fn episode_decoder() -> decode.Decoder(Episode) {
   use id <- decode.field("id", decode.optional(decode.string))
-  decode.success(Episode(id: id))
+  use name <- decode.field("name", decode.optional(decode.string))
+  decode.success(Episode(id: id, name: name))
 }
 
 pub fn characters_to_json(input: Characters) -> json.Json {
@@ -75,33 +72,43 @@ pub fn character_to_json(input: Character) -> json.Json {
 }
 
 pub fn location_to_json(input: Location) -> json.Json {
-  json.object([#("id", json.nullable(input.id, json.string))])
+  json.object(
+    [
+      #("id", json.nullable(input.id, json.string)),
+      #("name", json.nullable(input.name, json.string)),
+    ],
+  )
 }
 
 pub fn episode_to_json(input: Episode) -> json.Json {
-  json.object([#("id", json.nullable(input.id, json.string))])
+  json.object(
+    [
+      #("id", json.nullable(input.id, json.string)),
+      #("name", json.nullable(input.name, json.string)),
+    ],
+  )
 }
 
-pub type MultiQueryResponse {
-  MultiQueryResponse(
+pub type MultiQueryWithVarsResponse {
+  MultiQueryWithVarsResponse(
     characters: Option(Characters),
     location: Option(Location),
     episodes_by_ids: Option(List(Episode)),
   )
 }
 
-pub fn multi_query_response_decoder() -> decode.Decoder(MultiQueryResponse) {
+pub fn multi_query_with_vars_response_decoder() -> decode.Decoder(MultiQueryWithVarsResponse) {
   use characters <- decode.field("characters", decode.optional(characters_decoder()))
   use location <- decode.field("location", decode.optional(location_decoder()))
   use episodes_by_ids <- decode.field("episodesByIds", decode.optional(decode.list(episode_decoder())))
-  decode.success(MultiQueryResponse(
+  decode.success(MultiQueryWithVarsResponse(
     characters: characters,
     location: location,
     episodes_by_ids: episodes_by_ids,
   ))
 }
 
-pub fn multi_query_response_to_json(input: MultiQueryResponse) -> json.Json {
+pub fn multi_query_with_vars_response_to_json(input: MultiQueryWithVarsResponse) -> json.Json {
   json.object(
     [
       #("characters", json.nullable(input.characters, characters_to_json)),
@@ -114,38 +121,18 @@ pub fn multi_query_response_to_json(input: MultiQueryResponse) -> json.Json {
   )
 }
 
-pub fn multi_query(client: squall.Client) -> Result(MultiQueryResponse, String) {
-  let query =
-    "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }"
-  let variables =
-    json.object([])
-  let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
-  use req <- result.try(
-    request.to(client.endpoint)
-    |> result.map_error(fn(_) { "Invalid endpoint URL" }),
+pub fn multi_query_with_vars(client: squall.Client, page: Int, name: String, location_id: String, episode_ids: List(Int)) {
+  squall.execute_query(
+    client,
+    "query MultiQueryWithVars($page: Int, $name: String, $locationId: ID!, $episodeIds: [Int!]!) { characters(page: $page, filter: { name: $name }) { info { count } results { name } } location(id: $locationId) { id name } episodesByIds(ids: $episodeIds) { id name } }",
+    json.object(
+      [
+        #("page", json.int(page)),
+        #("name", json.string(name)),
+        #("locationId", json.string(location_id)),
+        #("episodeIds", json.array(from: episode_ids, of: json.int)),
+      ],
+    ),
+    multi_query_with_vars_response_decoder(),
   )
-  let req =
-    req
-    |> request.set_method(http.Post)
-    |> request.set_body(json.to_string(body))
-    |> request.set_header("content-type", "application/json")
-  let req =
-    list.fold(client.headers, req, fn(r, header) {
-      request.set_header(r, header.0, header.1)
-    })
-  use resp <- result.try(
-    httpc.send(req)
-    |> result.map_error(fn(_) { "HTTP request failed" }),
-  )
-  use json_value <- result.try(
-    json.parse(from: resp.body, using: decode.dynamic)
-    |> result.map_error(fn(_) { "Failed to decode JSON response" }),
-  )
-  let data_and_response_decoder = {
-    use data <- decode.field("data", multi_query_response_decoder())
-    decode.success(data)
-  }
-  decode.run(json_value, data_and_response_decoder)
-  |> result.map_error(fn(_) { "Failed to decode response data" })
 }

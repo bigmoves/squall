@@ -1,0 +1,18 @@
+query MultiQueryWithVars($page: Int, $name: String, $locationId: ID!, $episodeIds: [Int!]!) {
+  characters(page: $page, filter: { name: $name }) {
+    info {
+      count
+    }
+    results {
+      name
+    }
+  }
+  location(id: $locationId) {
+    id
+    name
+  }
+  episodesByIds(ids: $episodeIds) {
+    id
+    name
+  }
+}
