@@ -207,6 +207,7 @@ fn imports_doc(
   needs_option: Bool,
   needs_dynamic: Bool,
   needs_option_constructors: Bool,
+  needs_list: Bool,
 ) -> Document {
   // Minimal imports - just what we need for decoders and the squall client
   let core_imports = [
@@ -226,8 +227,14 @@ fn imports_doc(
     False -> []
   }
 
+  let list_imports = case needs_list {
+    True -> ["import gleam/list"]
+    False -> []
+  }
+
   list.append(core_imports, optional_imports)
   |> list.append(dynamic_imports)
+  |> list.append(list_imports)
   |> list.map(doc.from_string)
   |> doc.join(with: doc.line)
 }
@@ -371,10 +378,20 @@ pub fn generate_operation(
   // Only check output fields for Dynamic usage (input fields use json.Json, not Dynamic)
   let needs_dynamic = detect_dynamic_usage(output_field_types)
   let needs_option_constructors = detect_optional_input_fields(input_types)
+  // Need gleam/list import when there are input types (for list.filter_map in serializers)
+  let needs_list = case input_types {
+    [] -> False
+    _ -> True
+  }
 
   // Build imports
   let imports =
-    imports_doc(needs_option, needs_dynamic, needs_option_constructors)
+    imports_doc(
+      needs_option,
+      needs_dynamic,
+      needs_option_constructors,
+      needs_list,
+    )
 
   // Combine all code using doc combinators
   // Order: imports, input types, nested types, nested serializers, response type, response decoder, response serializer, function
