@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Query with inline array arguments
-file: ./test/codegen_test.gleam
-test_name: generate_inline_array_arguments_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -24,6 +22,15 @@ pub fn episode_decoder() -> decode.Decoder(Episode) {
   decode.success(Episode(id: id, name: name))
 }
 
+pub fn episode_to_json(input: Episode) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+    ],
+  )
+}
+
 pub type GetEpisodesResponse {
   GetEpisodesResponse(episodes_by_ids: Option(List(Episode)))
 }
@@ -31,6 +38,17 @@ pub type GetEpisodesResponse {
 pub fn get_episodes_response_decoder() -> decode.Decoder(GetEpisodesResponse) {
   use episodes_by_ids <- decode.field("episodesByIds", decode.optional(decode.list(episode_decoder())))
   decode.success(GetEpisodesResponse(episodes_by_ids: episodes_by_ids))
+}
+
+pub fn get_episodes_response_to_json(input: GetEpisodesResponse) -> json.Json {
+  json.object(
+    [
+      #("episodesByIds", json.nullable(
+        input.episodes_by_ids,
+        fn(list) { json.array(from: list, of: episode_to_json) },
+      )),
+    ],
+  )
 }
 
 pub fn get_episodes(client: squall.Client) -> Result(GetEpisodesResponse, String) {

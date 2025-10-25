@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Mutation with optional InputObject fields (imports Some, None)
-file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_optional_input_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -63,6 +61,16 @@ pub fn profile_decoder() -> decode.Decoder(Profile) {
   ))
 }
 
+pub fn profile_to_json(input: Profile) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("displayName", json.nullable(input.display_name, json.string)),
+      #("description", json.nullable(input.description, json.string)),
+    ],
+  )
+}
+
 pub type CreateProfileResponse {
   CreateProfileResponse(create_profile: Option(Profile))
 }
@@ -70,6 +78,14 @@ pub type CreateProfileResponse {
 pub fn create_profile_response_decoder() -> decode.Decoder(CreateProfileResponse) {
   use create_profile <- decode.field("createProfile", decode.optional(profile_decoder()))
   decode.success(CreateProfileResponse(create_profile: create_profile))
+}
+
+pub fn create_profile_response_to_json(input: CreateProfileResponse) -> json.Json {
+  json.object(
+    [
+      #("createProfile", json.nullable(input.create_profile, profile_to_json)),
+    ],
+  )
 }
 
 pub fn create_profile(client: squall.Client, input: ProfileInput) -> Result(CreateProfileResponse, String) {

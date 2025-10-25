@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Simple query function generation
-file: ./test/codegen_test.gleam
-test_name: generate_simple_query_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -24,6 +22,15 @@ pub fn user_decoder() -> decode.Decoder(User) {
   decode.success(User(id: id, name: name))
 }
 
+pub fn user_to_json(input: User) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.nullable(input.name, json.string)),
+    ],
+  )
+}
+
 pub type GetUserResponse {
   GetUserResponse(user: Option(User))
 }
@@ -31,6 +38,10 @@ pub type GetUserResponse {
 pub fn get_user_response_decoder() -> decode.Decoder(GetUserResponse) {
   use user <- decode.field("user", decode.optional(user_decoder()))
   decode.success(GetUserResponse(user: user))
+}
+
+pub fn get_user_response_to_json(input: GetUserResponse) -> json.Json {
+  json.object([#("user", json.nullable(input.user, user_to_json))])
 }
 
 pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {

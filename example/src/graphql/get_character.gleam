@@ -4,9 +4,9 @@ import gleam/http/request
 import gleam/httpc
 import gleam/json
 import gleam/list
-import gleam/option.{type Option}
 import gleam/result
 import squall
+import gleam/option.{type Option}
 
 pub type Character {
   Character(
@@ -36,25 +36,41 @@ pub fn character_decoder() -> decode.Decoder(Character) {
   ))
 }
 
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.nullable(input.id, json.string)),
+      #("name", json.nullable(input.name, json.string)),
+      #("status", json.nullable(input.status, json.string)),
+      #("species", json.nullable(input.species, json.string)),
+      #("type", json.nullable(input.type_, json.string)),
+      #("gender", json.nullable(input.gender, json.string)),
+    ],
+  )
+}
+
 pub type GetCharacterResponse {
   GetCharacterResponse(character: Option(Character))
 }
 
 pub fn get_character_response_decoder() -> decode.Decoder(GetCharacterResponse) {
-  use character <- decode.field(
-    "character",
-    decode.optional(character_decoder()),
-  )
+  use character <- decode.field("character", decode.optional(character_decoder()))
   decode.success(GetCharacterResponse(character: character))
 }
 
-pub fn get_character(
-  client: squall.Client,
-  id: String,
-) -> Result(GetCharacterResponse, String) {
+pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json {
+  json.object(
+    [
+      #("character", json.nullable(input.character, character_to_json)),
+    ],
+  )
+}
+
+pub fn get_character(client: squall.Client, id: String) -> Result(GetCharacterResponse, String) {
   let query =
     "query GetCharacter($id: ID!) { character(id: $id) { id name status species type gender } }"
-  let variables = json.object([#("id", json.string(id))])
+  let variables =
+    json.object([#("id", json.string(id))])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(

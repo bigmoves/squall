@@ -1,6 +1,6 @@
 ---
 version: 1.4.1
-title: Query with variables function generation
+title: Response serializer with nested types
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -13,20 +13,41 @@ import squall
 import gleam/option.{type Option}
 
 pub type User {
-  User(id: String, name: Option(String))
+  User(id: String, name: String, location: Option(Location))
 }
 
 pub fn user_decoder() -> decode.Decoder(User) {
   use id <- decode.field("id", decode.string)
-  use name <- decode.field("name", decode.optional(decode.string))
-  decode.success(User(id: id, name: name))
+  use name <- decode.field("name", decode.string)
+  use location <- decode.field("location", decode.optional(location_decoder()))
+  decode.success(User(id: id, name: name, location: location))
+}
+
+pub type Location {
+  Location(city: Option(String), country: Option(String))
+}
+
+pub fn location_decoder() -> decode.Decoder(Location) {
+  use city <- decode.field("city", decode.optional(decode.string))
+  use country <- decode.field("country", decode.optional(decode.string))
+  decode.success(Location(city: city, country: country))
 }
 
 pub fn user_to_json(input: User) -> json.Json {
   json.object(
     [
       #("id", json.string(input.id)),
-      #("name", json.nullable(input.name, json.string)),
+      #("name", json.string(input.name)),
+      #("location", json.nullable(input.location, location_to_json)),
+    ],
+  )
+}
+
+pub fn location_to_json(input: Location) -> json.Json {
+  json.object(
+    [
+      #("city", json.nullable(input.city, json.string)),
+      #("country", json.nullable(input.country, json.string)),
     ],
   )
 }
@@ -44,11 +65,11 @@ pub fn get_user_response_to_json(input: GetUserResponse) -> json.Json {
   json.object([#("user", json.nullable(input.user, user_to_json))])
 }
 
-pub fn get_user(client: squall.Client, id: String) -> Result(GetUserResponse, String) {
+pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {
   let query =
-    "query GetUser($id: ID!) { user(id: $id) { id name } }"
+    "query GetUser { user { id name location { city country } } }"
   let variables =
-    json.object([#("id", json.string(id))])
+    json.object([])
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
   use req <- result.try(

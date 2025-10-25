@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Query with multiple root fields and mixed arguments
-file: ./test/codegen_test.gleam
-test_name: generate_multiple_root_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -60,6 +58,34 @@ pub fn episode_decoder() -> decode.Decoder(Episode) {
   decode.success(Episode(id: id))
 }
 
+pub fn characters_result_to_json(input: CharactersResult) -> json.Json {
+  json.object(
+    [
+      #("info", json.nullable(input.info, info_to_json)),
+      #("results", json.nullable(
+        input.results,
+        fn(list) { json.array(from: list, of: character_to_json) },
+      )),
+    ],
+  )
+}
+
+pub fn info_to_json(input: Info) -> json.Json {
+  json.object([#("count", json.nullable(input.count, json.int))])
+}
+
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object([#("name", json.nullable(input.name, json.string))])
+}
+
+pub fn location_to_json(input: Location) -> json.Json {
+  json.object([#("id", json.nullable(input.id, json.string))])
+}
+
+pub fn episode_to_json(input: Episode) -> json.Json {
+  json.object([#("id", json.nullable(input.id, json.string))])
+}
+
 pub type MultiQueryResponse {
   MultiQueryResponse(
     characters: Option(CharactersResult),
@@ -77,6 +103,19 @@ pub fn multi_query_response_decoder() -> decode.Decoder(MultiQueryResponse) {
     location: location,
     episodes_by_ids: episodes_by_ids,
   ))
+}
+
+pub fn multi_query_response_to_json(input: MultiQueryResponse) -> json.Json {
+  json.object(
+    [
+      #("characters", json.nullable(input.characters, characters_result_to_json)),
+      #("location", json.nullable(input.location, location_to_json)),
+      #("episodesByIds", json.nullable(
+        input.episodes_by_ids,
+        fn(list) { json.array(from: list, of: episode_to_json) },
+      )),
+    ],
+  )
 }
 
 pub fn multi_query(client: squall.Client) -> Result(MultiQueryResponse, String) {

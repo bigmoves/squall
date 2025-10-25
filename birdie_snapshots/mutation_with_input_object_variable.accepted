@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Mutation with InputObject variable
-file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_input_object_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -49,6 +47,15 @@ pub fn profile_decoder() -> decode.Decoder(Profile) {
   decode.success(Profile(id: id, display_name: display_name))
 }
 
+pub fn profile_to_json(input: Profile) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("displayName", json.nullable(input.display_name, json.string)),
+    ],
+  )
+}
+
 pub type UpdateProfileResponse {
   UpdateProfileResponse(update_profile: Option(Profile))
 }
@@ -56,6 +63,14 @@ pub type UpdateProfileResponse {
 pub fn update_profile_response_decoder() -> decode.Decoder(UpdateProfileResponse) {
   use update_profile <- decode.field("updateProfile", decode.optional(profile_decoder()))
   decode.success(UpdateProfileResponse(update_profile: update_profile))
+}
+
+pub fn update_profile_response_to_json(input: UpdateProfileResponse) -> json.Json {
+  json.object(
+    [
+      #("updateProfile", json.nullable(input.update_profile, profile_to_json)),
+    ],
+  )
 }
 
 pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(UpdateProfileResponse, String) {

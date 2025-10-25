@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Query with optional response fields (no Some, None imports)
-file: ./test/codegen_test.gleam
-test_name: generate_query_with_optional_response_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -29,6 +27,16 @@ pub fn profile_decoder() -> decode.Decoder(Profile) {
   ))
 }
 
+pub fn profile_to_json(input: Profile) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("displayName", json.nullable(input.display_name, json.string)),
+      #("description", json.nullable(input.description, json.string)),
+    ],
+  )
+}
+
 pub type GetProfileResponse {
   GetProfileResponse(profile: Option(Profile))
 }
@@ -36,6 +44,10 @@ pub type GetProfileResponse {
 pub fn get_profile_response_decoder() -> decode.Decoder(GetProfileResponse) {
   use profile <- decode.field("profile", decode.optional(profile_decoder()))
   decode.success(GetProfileResponse(profile: profile))
+}
+
+pub fn get_profile_response_to_json(input: GetProfileResponse) -> json.Json {
+  json.object([#("profile", json.nullable(input.profile, profile_to_json))])
 }
 
 pub fn get_profile(client: squall.Client) -> Result(GetProfileResponse, String) {

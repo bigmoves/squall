@@ -1,6 +1,6 @@
 ---
 version: 1.4.1
-title: Query with JSON scalar field
+title: Response serializer with all scalar types
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -13,43 +13,63 @@ import squall
 import gleam/option.{type Option}
 import gleam/dynamic.{type Dynamic}
 
-pub type Profile {
-  Profile(id: String, display_name: Option(String), metadata: Option(Dynamic))
+pub type Product {
+  Product(
+    id: String,
+    name: String,
+    price: Float,
+    in_stock: Bool,
+    rating: Int,
+    metadata: Option(Dynamic),
+  )
 }
 
-pub fn profile_decoder() -> decode.Decoder(Profile) {
+pub fn product_decoder() -> decode.Decoder(Product) {
   use id <- decode.field("id", decode.string)
-  use display_name <- decode.field("displayName", decode.optional(decode.string))
+  use name <- decode.field("name", decode.string)
+  use price <- decode.field("price", decode.float)
+  use in_stock <- decode.field("inStock", decode.bool)
+  use rating <- decode.field("rating", decode.int)
   use metadata <- decode.field("metadata", decode.optional(decode.dynamic))
-  decode.success(Profile(id: id, display_name: display_name, metadata: metadata))
+  decode.success(Product(
+    id: id,
+    name: name,
+    price: price,
+    in_stock: in_stock,
+    rating: rating,
+    metadata: metadata,
+  ))
 }
 
-pub fn profile_to_json(input: Profile) -> json.Json {
+pub fn product_to_json(input: Product) -> json.Json {
   json.object(
     [
       #("id", json.string(input.id)),
-      #("displayName", json.nullable(input.display_name, json.string)),
+      #("name", json.string(input.name)),
+      #("price", json.float(input.price)),
+      #("inStock", json.bool(input.in_stock)),
+      #("rating", json.int(input.rating)),
       #("metadata", json.nullable(input.metadata, json.string)),
     ],
   )
 }
 
-pub type GetProfileResponse {
-  GetProfileResponse(profile: Option(Profile))
+pub type GetProductResponse {
+  GetProductResponse(product: Option(Product))
 }
 
-pub fn get_profile_response_decoder() -> decode.Decoder(GetProfileResponse) {
-  use profile <- decode.field("profile", decode.optional(profile_decoder()))
-  decode.success(GetProfileResponse(profile: profile))
+pub fn get_product_response_decoder() -> decode.Decoder(GetProductResponse) {
+  use product <- decode.field("product", decode.optional(product_decoder()))
+  decode.success(GetProductResponse(product: product))
 }
 
-pub fn get_profile_response_to_json(input: GetProfileResponse) -> json.Json {
-  json.object([#("profile", json.nullable(input.profile, profile_to_json))])
+pub fn get_product_response_to_json(input: GetProductResponse) -> json.Json {
+  json.object([#("product", json.nullable(input.product, product_to_json))])
 }
 
-pub fn get_profile(client: squall.Client) -> Result(GetProfileResponse, String) {
+pub fn get_product(client: squall.Client) -> Result(GetProductResponse, String) {
   let query =
-    "query GetProfile { profile { id displayName metadata } }"
+    "query GetProduct { product { id name price inStock rating metadata } }"
   let variables =
     json.object([])
   let body =
@@ -76,7 +96,7 @@ pub fn get_profile(client: squall.Client) -> Result(GetProfileResponse, String) 
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
   let data_and_response_decoder = {
-    use data <- decode.field("data", get_profile_response_decoder())
+    use data <- decode.field("data", get_product_response_decoder())
     decode.success(data)
   }
   decode.run(json_value, data_and_response_decoder)

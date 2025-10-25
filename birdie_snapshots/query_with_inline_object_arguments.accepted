@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Query with inline object arguments
-file: ./test/codegen_test.gleam
-test_name: generate_inline_object_arguments_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -33,6 +31,26 @@ pub fn character_decoder() -> decode.Decoder(Character) {
   decode.success(Character(id: id, name: name))
 }
 
+pub fn characters_result_to_json(input: CharactersResult) -> json.Json {
+  json.object(
+    [
+      #("results", json.nullable(
+        input.results,
+        fn(list) { json.array(from: list, of: character_to_json) },
+      )),
+    ],
+  )
+}
+
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+    ],
+  )
+}
+
 pub type GetCharactersResponse {
   GetCharactersResponse(characters: Option(CharactersResult))
 }
@@ -40,6 +58,14 @@ pub type GetCharactersResponse {
 pub fn get_characters_response_decoder() -> decode.Decoder(GetCharactersResponse) {
   use characters <- decode.field("characters", decode.optional(characters_result_decoder()))
   decode.success(GetCharactersResponse(characters: characters))
+}
+
+pub fn get_characters_response_to_json(input: GetCharactersResponse) -> json.Json {
+  json.object(
+    [
+      #("characters", json.nullable(input.characters, characters_result_to_json)),
+    ],
+  )
 }
 
 pub fn get_characters(client: squall.Client) -> Result(GetCharactersResponse, String) {
