@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Type with reserved keywords
-file: ./test/codegen_test.gleam
-test_name: generate_with_reserved_keywords_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -31,6 +29,17 @@ pub fn item_decoder() -> decode.Decoder(Item) {
   decode.success(Item(id: id, type_: type_, case_: case_, let_: let_))
 }
 
+pub fn item_to_json(input: Item) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("type", json.nullable(input.type_, json.string)),
+      #("case", json.nullable(input.case_, json.string)),
+      #("let", json.nullable(input.let_, json.string)),
+    ],
+  )
+}
+
 pub type GetItemResponse {
   GetItemResponse(item: Option(Item))
 }
@@ -38,6 +47,10 @@ pub type GetItemResponse {
 pub fn get_item_response_decoder() -> decode.Decoder(GetItemResponse) {
   use item <- decode.field("item", decode.optional(item_decoder()))
   decode.success(GetItemResponse(item: item))
+}
+
+pub fn get_item_response_to_json(input: GetItemResponse) -> json.Json {
+  json.object([#("item", json.nullable(input.item, item_to_json))])
 }
 
 pub fn get_item(client: squall.Client) -> Result(GetItemResponse, String) {

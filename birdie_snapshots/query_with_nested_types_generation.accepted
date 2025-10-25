@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Query with nested types generation
-file: ./test/codegen_test.gleam
-test_name: generate_query_with_nested_types_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -25,6 +23,16 @@ pub fn character_decoder() -> decode.Decoder(Character) {
   decode.success(Character(id: id, name: name, status: status))
 }
 
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+      #("status", json.string(input.status)),
+    ],
+  )
+}
+
 pub type GetCharacterResponse {
   GetCharacterResponse(character: Option(Character))
 }
@@ -32,6 +40,14 @@ pub type GetCharacterResponse {
 pub fn get_character_response_decoder() -> decode.Decoder(GetCharacterResponse) {
   use character <- decode.field("character", decode.optional(character_decoder()))
   decode.success(GetCharacterResponse(character: character))
+}
+
+pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json {
+  json.object(
+    [
+      #("character", json.nullable(input.character, character_to_json)),
+    ],
+  )
 }
 
 pub fn get_character(client: squall.Client, id: String) -> Result(GetCharacterResponse, String) {

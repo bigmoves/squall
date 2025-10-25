@@ -1,8 +1,6 @@
 ---
 version: 1.4.1
 title: Mutation with JSON scalar in InputObject
-file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_json_input_field_test
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -50,6 +48,15 @@ pub fn settings_decoder() -> decode.Decoder(Settings) {
   decode.success(Settings(id: id, metadata: metadata))
 }
 
+pub fn settings_to_json(input: Settings) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("metadata", json.nullable(input.metadata, json.string)),
+    ],
+  )
+}
+
 pub type UpdateSettingsResponse {
   UpdateSettingsResponse(update_settings: Option(Settings))
 }
@@ -57,6 +64,14 @@ pub type UpdateSettingsResponse {
 pub fn update_settings_response_decoder() -> decode.Decoder(UpdateSettingsResponse) {
   use update_settings <- decode.field("updateSettings", decode.optional(settings_decoder()))
   decode.success(UpdateSettingsResponse(update_settings: update_settings))
+}
+
+pub fn update_settings_response_to_json(input: UpdateSettingsResponse) -> json.Json {
+  json.object(
+    [
+      #("updateSettings", json.nullable(input.update_settings, settings_to_json)),
+    ],
+  )
 }
 
 pub fn update_settings(client: squall.Client, input: SettingsInput) -> Result(UpdateSettingsResponse, String) {

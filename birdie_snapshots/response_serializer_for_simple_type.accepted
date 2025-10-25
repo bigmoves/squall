@@ -1,6 +1,6 @@
 ---
 version: 1.4.1
-title: Query with inline scalar arguments
+title: Response serializer for simple type
 ---
 import gleam/dynamic/decode
 import gleam/http
@@ -12,17 +12,17 @@ import gleam/result
 import squall
 import gleam/option.{type Option}
 
-pub type Character {
-  Character(id: String, name: String)
+pub type User {
+  User(id: String, name: String)
 }
 
-pub fn character_decoder() -> decode.Decoder(Character) {
+pub fn user_decoder() -> decode.Decoder(User) {
   use id <- decode.field("id", decode.string)
   use name <- decode.field("name", decode.string)
-  decode.success(Character(id: id, name: name))
+  decode.success(User(id: id, name: name))
 }
 
-pub fn character_to_json(input: Character) -> json.Json {
+pub fn user_to_json(input: User) -> json.Json {
   json.object(
     [
       #("id", json.string(input.id)),
@@ -31,26 +31,22 @@ pub fn character_to_json(input: Character) -> json.Json {
   )
 }
 
-pub type GetCharacterResponse {
-  GetCharacterResponse(character: Option(Character))
+pub type GetUserResponse {
+  GetUserResponse(user: Option(User))
 }
 
-pub fn get_character_response_decoder() -> decode.Decoder(GetCharacterResponse) {
-  use character <- decode.field("character", decode.optional(character_decoder()))
-  decode.success(GetCharacterResponse(character: character))
+pub fn get_user_response_decoder() -> decode.Decoder(GetUserResponse) {
+  use user <- decode.field("user", decode.optional(user_decoder()))
+  decode.success(GetUserResponse(user: user))
 }
 
-pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json {
-  json.object(
-    [
-      #("character", json.nullable(input.character, character_to_json)),
-    ],
-  )
+pub fn get_user_response_to_json(input: GetUserResponse) -> json.Json {
+  json.object([#("user", json.nullable(input.user, user_to_json))])
 }
 
-pub fn get_character(client: squall.Client) -> Result(GetCharacterResponse, String) {
+pub fn get_user(client: squall.Client) -> Result(GetUserResponse, String) {
   let query =
-    "query GetCharacter { character(id: 1) { id name } }"
+    "query GetUser { user { id name } }"
   let variables =
     json.object([])
   let body =
@@ -77,7 +73,7 @@ pub fn get_character(client: squall.Client) -> Result(GetCharacterResponse, Stri
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
   let data_and_response_decoder = {
-    use data <- decode.field("data", get_character_response_decoder())
+    use data <- decode.field("data", get_user_response_decoder())
     decode.success(data)
   }
   decode.run(json_value, data_and_response_decoder)

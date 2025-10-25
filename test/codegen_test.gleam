@@ -1333,3 +1333,400 @@ pub fn generate_query_with_optional_response_fields_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate response serializer for simple type
+pub fn generate_response_serializer_simple_test() {
+  let query_source =
+    "
+    query GetUser {
+      user {
+        id
+        name
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with user type
+  let user_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("User", schema.ObjectType("User", user_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "user",
+                schema.NamedType("User", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_user", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Response serializer for simple type")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate response serializer with optional fields
+pub fn generate_response_serializer_with_optional_fields_test() {
+  let query_source =
+    "
+    query GetUser {
+      user {
+        id
+        name
+        email
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with optional fields
+  let user_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+    schema.Field(
+      "email",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("User", schema.ObjectType("User", user_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "user",
+                schema.NamedType("User", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_user", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Response serializer with optional fields")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate response serializer with nested types
+pub fn generate_response_serializer_with_nested_types_test() {
+  let query_source =
+    "
+    query GetUser {
+      user {
+        id
+        name
+        location {
+          city
+          country
+        }
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with nested types
+  let location_fields = [
+    schema.Field(
+      "city",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+    schema.Field(
+      "country",
+      schema.NamedType("String", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let user_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "location",
+      schema.NamedType("Location", schema.Object),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Location", schema.ObjectType("Location", location_fields, None)),
+        #("User", schema.ObjectType("User", user_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "user",
+                schema.NamedType("User", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_user", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Response serializer with nested types")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate response serializer with lists
+pub fn generate_response_serializer_with_lists_test() {
+  let query_source =
+    "
+    query GetUsers {
+      users {
+        id
+        name
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with list type
+  let user_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("User", schema.ObjectType("User", user_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "users",
+                schema.ListType(schema.NamedType("User", schema.Object)),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_users", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Response serializer with lists")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate response serializer with all scalar types
+pub fn generate_response_serializer_with_all_scalars_test() {
+  let query_source =
+    "
+    query GetProduct {
+      product {
+        id
+        name
+        price
+        inStock
+        rating
+        metadata
+      }
+    }
+  "
+
+  let assert Ok(operation) = parser.parse(query_source)
+
+  // Create mock schema with all scalar types
+  let product_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "price",
+      schema.NonNullType(schema.NamedType("Float", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "inStock",
+      schema.NonNullType(schema.NamedType("Boolean", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "rating",
+      schema.NonNullType(schema.NamedType("Int", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "metadata",
+      schema.NamedType("JSON", schema.Scalar),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Product", schema.ObjectType("Product", product_fields, None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "product",
+                schema.NamedType("Product", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+        #("JSON", schema.ScalarType("JSON", None)),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation("get_product", operation, mock_schema, "")
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Response serializer with all scalar types")
+    }
+    Error(_) -> Nil
+  }
+}
