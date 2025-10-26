@@ -247,12 +247,14 @@ Example:
   )
 }
 
+@target(erlang)
 fn generate_with_env() {
   io.println("Error: GRAPHQL_ENDPOINT environment variable not set")
   io.println("Usage: gleam run -m squall generate <endpoint>")
   Nil
 }
 
+@target(erlang)
 fn generate(endpoint: String) {
   io.println("🌊 Squall - GraphQL Code Generator")
   io.println("================================\n")
