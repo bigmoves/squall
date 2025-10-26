@@ -32,6 +32,14 @@ pub fn find_graphql_files(root: String) -> Result(List(GraphQLFile), Error) {
   }
 }
 
+@target(javascript)
+pub fn find_graphql_files(_root: String) -> Result(List(GraphQLFile), Error) {
+  Error(error.CannotReadFile(
+    "",
+    "File system access not available on JavaScript target",
+  ))
+}
+
 /// Read a GraphQL file and extract its operation name
 @target(erlang)
 fn read_graphql_file(path: String) -> Result(GraphQLFile, Error) {
