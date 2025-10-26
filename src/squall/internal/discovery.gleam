@@ -11,8 +11,8 @@ pub type GraphQLFile {
   GraphQLFile(path: String, operation_name: String, content: String)
 }
 
-/// Find all .gql files in graphql/ directories under the given root path
 @target(erlang)
+/// Find all .gql files in graphql/ directories under the given root path
 pub fn find_graphql_files(root: String) -> Result(List(GraphQLFile), Error) {
   case walk_directory(root) {
     Ok(paths) -> {
@@ -40,8 +40,8 @@ pub fn find_graphql_files(_root: String) -> Result(List(GraphQLFile), Error) {
   ))
 }
 
-/// Read a GraphQL file and extract its operation name
 @target(erlang)
+/// Read a GraphQL file and extract its operation name
 fn read_graphql_file(path: String) -> Result(GraphQLFile, Error) {
   use operation_name <- result.try(extract_operation_name(path))
   use content <- result.try(
@@ -136,8 +136,8 @@ fn is_digit(char: String) -> Bool {
   }
 }
 
-/// Recursively walk a directory and return all file paths
 @target(erlang)
+/// Recursively walk a directory and return all file paths
 fn walk_directory(path: String) -> Result(List(String), simplifile.FileError) {
   use is_dir <- result.try(simplifile.is_directory(path))
 
