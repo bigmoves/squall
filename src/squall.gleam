@@ -12,10 +12,20 @@ import squall/adapter.{type HttpAdapter}
 
 @target(erlang)
 import simplifile
+
+@target(erlang)
 import squall/internal/codegen
+
+@target(erlang)
 import squall/internal/discovery
+
+@target(erlang)
 import squall/internal/error
+
+@target(erlang)
 import squall/internal/parser
+
+@target(erlang)
 import squall/internal/schema
 
 @target(erlang)
@@ -213,6 +223,7 @@ pub fn execute_query(
   |> result.map_error(fn(_) { "Failed to decode response data" })
 }
 
+@target(erlang)
 pub fn main() {
   case argv.load().arguments {
     ["generate", endpoint] -> generate(endpoint)
@@ -224,6 +235,7 @@ pub fn main() {
   }
 }
 
+@target(erlang)
 fn print_usage() {
   io.println(
     "
@@ -331,6 +343,7 @@ fn generate(endpoint: String) {
   }
 }
 
+@target(erlang)
 fn introspect_schema(endpoint: String) -> Result(schema.Schema, error.Error) {
   // Build introspection query
   let introspection_query =
@@ -409,6 +422,7 @@ fn introspect_schema(endpoint: String) -> Result(schema.Schema, error.Error) {
   schema.parse_introspection_response(response)
 }
 
+@target(erlang)
 fn make_graphql_request(
   endpoint: String,
   query: String,
