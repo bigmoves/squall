@@ -2,8 +2,10 @@ import filepath
 import gleam/list
 import gleam/result
 import gleam/string
-import simplifile
 import squall/internal/error.{type Error}
+
+@target(erlang)
+import simplifile
 
 pub type GraphQLFile {
   GraphQLFile(path: String, operation_name: String, content: String)

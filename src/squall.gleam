@@ -8,8 +8,10 @@ import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
-import simplifile
 import squall/adapter.{type HttpAdapter}
+
+@target(erlang)
+import simplifile
 import squall/internal/codegen
 import squall/internal/discovery
 import squall/internal/error
