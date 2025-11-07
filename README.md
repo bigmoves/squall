@@ -11,7 +11,7 @@ A type-safe **sans-io** GraphQL client generator for Gleam.
 Squall generates functions to **build HTTP requests** and **parse HTTP responses**, but doesn't send them. You control the HTTP layer.
 
 **Benefits:**
-- Works on any Gleam target (Erlang, JavaScript, future targets)
+- Can be used on both erlang and javascript runtimes
 - Use any HTTP client you want
 - Easy to test without mocking
 - Full control over retries, timeouts, logging
