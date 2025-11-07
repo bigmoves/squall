@@ -2,7 +2,7 @@ import birdie
 import gleam/dict
 import gleam/option.{None, Some}
 import squall/internal/codegen
-import squall/internal/parser
+import squall/internal/graphql_ast
 import squall/internal/schema
 
 // Test: Generate simple query function
@@ -17,7 +17,7 @@ pub fn generate_simple_query_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with user type
   let user_fields = [
@@ -79,7 +79,7 @@ pub fn generate_query_with_variables_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let user_fields = [
     schema.Field(
@@ -147,7 +147,7 @@ pub fn generate_query_with_nested_types_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let character_fields = [
     schema.Field(
@@ -225,7 +225,7 @@ pub fn generate_mutation_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(mutation_source)
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
 
   let user_fields = [
     schema.Field(
@@ -299,7 +299,7 @@ pub fn generate_with_reserved_keywords_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let item_fields = [
     schema.Field(
@@ -362,7 +362,7 @@ pub fn generate_inline_scalar_arguments_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let character_fields = [
     schema.Field(
@@ -436,7 +436,7 @@ pub fn generate_inline_object_arguments_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let character_fields = [
     schema.Field(
@@ -521,7 +521,7 @@ pub fn generate_inline_array_arguments_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let episode_fields = [
     schema.Field(
@@ -605,7 +605,7 @@ pub fn generate_multiple_root_fields_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   let character_fields = [
     schema.Field("name", schema.NamedType("String", schema.Scalar), [], None),
@@ -728,7 +728,7 @@ pub fn generate_mutation_with_input_object_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(mutation_source)
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
 
   // Define InputObject type in schema
   let profile_input_fields = [
@@ -821,7 +821,7 @@ pub fn generate_mutation_with_nested_input_object_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(mutation_source)
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
 
   // Define nested InputObject types
   let blob_input_fields = [
@@ -939,7 +939,7 @@ pub fn generate_query_with_all_non_nullable_fields_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with all non-nullable fields
   let product_fields = [
@@ -1015,7 +1015,7 @@ pub fn generate_query_with_json_scalar_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with JSON scalar field
   let profile_fields = [
@@ -1083,7 +1083,7 @@ pub fn generate_mutation_with_json_input_field_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(mutation_source)
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
 
   // Define InputObject type with JSON field
   let settings_input_fields = [
@@ -1168,7 +1168,7 @@ pub fn generate_mutation_with_optional_input_fields_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(mutation_source)
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
 
   // Define InputObject type with optional fields (nullable in GraphQL)
   let profile_input_fields = [
@@ -1271,7 +1271,7 @@ pub fn generate_query_with_optional_response_fields_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with optional response fields
   let profile_fields = [
@@ -1346,7 +1346,7 @@ pub fn generate_response_serializer_simple_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with user type
   let user_fields = [
@@ -1414,7 +1414,7 @@ pub fn generate_response_serializer_with_optional_fields_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with optional fields
   let user_fields = [
@@ -1481,7 +1481,7 @@ pub fn generate_response_serializer_with_nested_types_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with nested types
   let location_fields = [
@@ -1560,7 +1560,7 @@ pub fn generate_response_serializer_with_lists_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with list type
   let user_fields = [
@@ -1631,7 +1631,7 @@ pub fn generate_response_serializer_with_all_scalars_test() {
     }
   "
 
-  let assert Ok(operation) = parser.parse(query_source)
+  let assert Ok(operation) = graphql_ast.parse(query_source)
 
   // Create mock schema with all scalar types
   let product_fields = [

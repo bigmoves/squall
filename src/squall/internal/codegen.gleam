@@ -1,15 +1,14 @@
 import glam/doc.{type Document}
 import gleam/dict
-import gleam/float
-import gleam/int
 import gleam/list
 import gleam/option.{None, Some}
 import gleam/result
 import gleam/string
 import squall/internal/error.{type Error}
-import squall/internal/parser
+import squall/internal/graphql_ast
 import squall/internal/schema
 import squall/internal/type_mapping
+import swell/parser
 
 pub type GeneratedCode {
   GeneratedCode(
@@ -244,18 +243,18 @@ fn imports_doc(
 // Generate code for an operation
 pub fn generate_operation(
   operation_name: String,
-  operation: parser.Operation,
+  operation: graphql_ast.Operation,
   schema_data: schema.Schema,
   _graphql_endpoint: String,
 ) -> Result(String, Error) {
   // Extract selections
-  let selections = parser.get_selections(operation)
+  let selections = graphql_ast.get_selections(operation)
 
   // Determine root type based on operation type
-  let root_type_name = case parser.get_operation_type(operation) {
-    parser.Query -> schema_data.query_type
-    parser.Mutation -> schema_data.mutation_type
-    parser.Subscription -> schema_data.subscription_type
+  let root_type_name = case graphql_ast.get_operation_type(operation) {
+    graphql_ast.Query -> schema_data.query_type
+    graphql_ast.Mutation -> schema_data.mutation_type
+    graphql_ast.Subscription -> schema_data.subscription_type
   }
 
   use root_type_name_str <- result.try(
@@ -332,7 +331,7 @@ pub fn generate_operation(
     )
 
   // Collect Input types from variables
-  let variables = parser.get_variables(operation)
+  let variables = graphql_ast.get_variables(operation)
   use input_types <- result.try(collect_input_types(
     variables,
     schema_data.types,
@@ -411,42 +410,51 @@ pub fn generate_operation(
 
 // Collect field types from selections
 fn collect_field_types(
-  selections: List(parser.Selection),
+  selections: List(graphql_ast.Selection),
   parent_type: schema.Type,
 ) -> Result(List(#(String, schema.TypeRef)), Error) {
   selections
+  |> list.filter(fn(selection) {
+    case selection {
+      parser.Field(_, _, _, _) -> True
+      parser.FragmentSpread(_) | parser.InlineFragment(_, _) -> False
+    }
+  })
   |> list.try_map(fn(selection) {
     case selection {
-      parser.FieldSelection(field_name, _alias, _args, _nested) -> {
+      parser.Field(field_name, _alias, _args, _nested) -> {
         // Find field in parent type
         let fields = schema.get_type_fields(parent_type)
         let field_result =
           fields
           |> list.find(fn(f) { f.name == field_name })
 
-        use field <- result.try(
-          field_result
-          |> result.map_error(fn(_) {
-            error.InvalidSchemaResponse("Field not found: " <> field_name)
-          }),
-        )
-
-        Ok(#(field_name, field.type_ref))
+        field_result
+        |> result.map(fn(field) { #(field_name, field.type_ref) })
+        |> result.map_error(fn(_) {
+          error.InvalidSchemaResponse("Field not found: " <> field_name)
+        })
       }
+      _ ->
+        Error(error.InvalidGraphQLSyntax(
+          "collect_field_types",
+          0,
+          "Unexpected selection type",
+        ))
     }
   })
 }
 
 // Collect nested types that need to be generated
 fn collect_nested_types(
-  selections: List(parser.Selection),
+  selections: List(graphql_ast.Selection),
   parent_type: schema.Type,
   schema_data: schema.Schema,
 ) -> Result(List(NestedTypeInfo), Error) {
   selections
   |> list.try_map(fn(selection) {
     case selection {
-      parser.FieldSelection(field_name, _alias, _args, nested_selections) -> {
+      parser.Field(field_name, _alias, _args, nested_selections) -> {
         // Find field in parent type
         let fields = schema.get_type_fields(parent_type)
         use field <- result.try(
@@ -496,6 +504,8 @@ fn collect_nested_types(
           }
         }
       }
+      // Fragments not yet supported - ignore them
+      parser.FragmentSpread(_) | parser.InlineFragment(_, _) -> Ok([])
     }
   })
   |> result.map(list.flatten)
@@ -520,16 +530,14 @@ fn unwrap_option_type(type_ref: schema.TypeRef) -> schema.TypeRef {
 
 // Collect all InputObject types used in variables
 fn collect_input_types(
-  variables: List(parser.Variable),
+  variables: List(graphql_ast.Variable),
   schema_types: dict.Dict(String, schema.Type),
 ) -> Result(List(InputTypeInfo), Error) {
   variables
   |> list.try_map(fn(var) {
+    let type_str = graphql_ast.get_variable_type_string(var)
     use schema_type_ref <- result.try(
-      type_mapping.parser_type_to_schema_type_with_schema(
-        var.type_ref,
-        schema_types,
-      ),
+      type_mapping.parse_type_string_with_schema(type_str, schema_types),
     )
     collect_input_types_from_type_ref(schema_type_ref, schema_types, [])
   })
@@ -1191,7 +1199,7 @@ fn encode_response_field_value(
 fn generate_function(
   operation_name: String,
   response_type_name: String,
-  variables: List(parser.Variable),
+  variables: List(graphql_ast.Variable),
   query_string: String,
   schema_types: dict.Dict(String, schema.Type),
 ) -> Document {
@@ -1204,17 +1212,15 @@ fn generate_function(
       let var_param_docs =
         vars
         |> list.map(fn(var) {
+          let type_str = graphql_ast.get_variable_type_string(var)
           use schema_type_ref <- result.try(
-            type_mapping.parser_type_to_schema_type_with_schema(
-              var.type_ref,
-              schema_types,
-            ),
+            type_mapping.parse_type_string_with_schema(type_str, schema_types),
           )
           use gleam_type <- result.try(type_mapping.graphql_to_gleam(
             schema_type_ref,
             type_mapping.InputContext,
           ))
-          let param_name = snake_case(var.name)
+          let param_name = snake_case(graphql_ast.get_variable_name(var))
           Ok(doc.from_string(
             param_name <> ": " <> type_mapping.to_gleam_type_string(gleam_type),
           ))
@@ -1232,17 +1238,15 @@ fn generate_function(
       let var_entry_docs =
         vars
         |> list.map(fn(var) {
+          let type_str = graphql_ast.get_variable_type_string(var)
           use schema_type_ref <- result.try(
-            type_mapping.parser_type_to_schema_type_with_schema(
-              var.type_ref,
-              schema_types,
-            ),
+            type_mapping.parse_type_string_with_schema(type_str, schema_types),
           )
           use gleam_type <- result.try(type_mapping.graphql_to_gleam(
             schema_type_ref,
             type_mapping.InputContext,
           ))
-          let param_name = snake_case(var.name)
+          let param_name = snake_case(graphql_ast.get_variable_name(var))
           let value_encoder =
             encode_variable_value(
               param_name,
@@ -1365,63 +1369,66 @@ fn encode_variable_value(
   }
 }
 
-fn build_query_string(operation: parser.Operation) -> String {
-  let op_type = case parser.get_operation_type(operation) {
-    parser.Query -> "query"
-    parser.Mutation -> "mutation"
-    parser.Subscription -> "subscription"
+fn build_query_string(operation: graphql_ast.Operation) -> String {
+  let op_type = case graphql_ast.get_operation_type(operation) {
+    graphql_ast.Query -> "query"
+    graphql_ast.Mutation -> "mutation"
+    graphql_ast.Subscription -> "subscription"
   }
 
-  let op_name = case parser.get_operation_name(operation) {
+  let op_name = case graphql_ast.get_operation_name(operation) {
     Some(name) -> " " <> name
     None -> ""
   }
 
-  let variables = parser.get_variables(operation)
+  let variables = graphql_ast.get_variables(operation)
   let var_defs = case variables {
     [] -> ""
     vars -> {
       let defs =
         vars
         |> list.map(fn(var) {
-          "$" <> var.name <> ": " <> type_ref_to_string(var.type_ref)
+          "$"
+          <> graphql_ast.get_variable_name(var)
+          <> ": "
+          <> graphql_ast.get_variable_type_string(var)
         })
         |> string.join(", ")
       "(" <> defs <> ")"
     }
   }
 
-  let selections = parser.get_selections(operation)
+  let selections = graphql_ast.get_selections(operation)
   let selection_set = build_selection_set(selections)
 
   op_type <> op_name <> var_defs <> " " <> selection_set
 }
 
-fn build_selection_set(selections: List(parser.Selection)) -> String {
+fn build_selection_set(selections: List(graphql_ast.Selection)) -> String {
   let fields =
     selections
+    |> list.filter(fn(selection) {
+      case selection {
+        parser.Field(_, _, _, _) -> True
+        parser.FragmentSpread(_) | parser.InlineFragment(_, _) -> False
+      }
+    })
     |> list.map(fn(selection) {
       case selection {
-        parser.FieldSelection(name, _alias, args, nested) -> {
+        parser.Field(name, _alias, args, nested) -> {
           let args_str = format_arguments(args)
           case nested {
             [] -> name <> args_str
             subs -> name <> args_str <> " " <> build_selection_set(subs)
           }
         }
+        _ -> ""
+        // This should never happen due to the filter above
       }
     })
     |> string.join(" ")
 
   "{ " <> fields <> " }"
-}
-
-fn type_ref_to_string(type_ref: parser.TypeRef) -> String {
-  case type_ref {
-    parser.NamedTypeRef(name) -> name
-    parser.ListTypeRef(inner) -> "[" <> type_ref_to_string(inner) <> "]"
-    parser.NonNullTypeRef(inner) -> type_ref_to_string(inner) <> "!"
-  }
 }
 
 // Helper functions
@@ -1440,14 +1447,15 @@ fn to_pascal_case(s: String) -> String {
   |> string.join("")
 }
 
-fn format_value(value: parser.Value) -> String {
+fn format_value(value: parser.ArgumentValue) -> String {
   case value {
-    parser.IntValue(i) -> int.to_string(i)
-    parser.FloatValue(f) -> float.to_string(f)
+    parser.IntValue(i) -> i
+    parser.FloatValue(f) -> f
     parser.StringValue(s) -> "\"" <> s <> "\""
     parser.BooleanValue(True) -> "true"
     parser.BooleanValue(False) -> "false"
     parser.NullValue -> "null"
+    parser.EnumValue(name) -> name
     parser.VariableValue(name) -> "$" <> name
     parser.ListValue(values) -> {
       let formatted_values =

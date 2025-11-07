@@ -23,7 +23,7 @@ import squall/internal/discovery
 import squall/internal/error
 
 @target(erlang)
-import squall/internal/parser
+import squall/internal/graphql_ast
 
 @target(erlang)
 import squall/internal/schema
@@ -290,7 +290,7 @@ fn generate(endpoint: String) {
           list.each(files, fn(file) {
             io.println("📝 Processing: " <> file.path)
 
-            case parser.parse(file.content) {
+            case graphql_ast.parse(file.content) {
               Ok(operation) -> {
                 case
                   codegen.generate_operation(

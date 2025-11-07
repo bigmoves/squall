@@ -1,6 +1,5 @@
 import gleam/option.{Some}
 import gleeunit/should
-import squall/internal/parser
 import squall/internal/schema
 import squall/internal/type_mapping
 
@@ -149,10 +148,10 @@ pub fn map_custom_object_type_test() {
   |> should.equal(Some("Character"))
 }
 
-// Test: Parse variable type from parser TypeRef
+// Test: Parse variable type string
 pub fn parse_variable_type_test() {
-  let parser_type = parser.NonNullTypeRef(parser.NamedTypeRef("ID"))
-  let result = type_mapping.parser_type_to_schema_type(parser_type)
+  let type_string = "ID!"
+  let result = type_mapping.parse_type_string(type_string)
 
   should.be_ok(result)
   let assert Ok(schema_type) = result

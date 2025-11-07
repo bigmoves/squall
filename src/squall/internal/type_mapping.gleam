@@ -1,8 +1,9 @@
 import gleam/dict
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/result
+import gleam/string
 import squall/internal/error.{type Error}
-import squall/internal/parser
 import squall/internal/schema
 
 // Type context for distinguishing input vs output types
@@ -91,31 +92,204 @@ fn map_scalar_type(
   }
 }
 
-// Convert parser TypeRef to schema TypeRef
-pub fn parser_type_to_schema_type(
-  parser_type: parser.TypeRef,
-) -> Result(schema.TypeRef, Error) {
-  case parser_type {
-    parser.NamedTypeRef(name) -> Ok(schema.NamedType(name, schema.Scalar))
-    parser.ListTypeRef(inner) -> {
-      use inner_schema <- result.try(parser_type_to_schema_type(inner))
-      Ok(schema.ListType(inner_schema))
+// Parse a GraphQL type string (e.g., "String!", "[Int]", "[User!]!") into a schema TypeRef
+pub fn parse_type_string(type_str: String) -> Result(schema.TypeRef, Error) {
+  parse_type_string_helper(type_str, 0).0
+}
+
+// Helper for parsing type strings recursively
+// Returns (Result, position_after_parsing)
+fn parse_type_string_helper(
+  type_str: String,
+  pos: Int,
+) -> #(Result(schema.TypeRef, Error), Int) {
+  let chars = string.to_graphemes(type_str)
+
+  // Skip whitespace
+  let pos = skip_whitespace(chars, pos)
+
+  case list_at(chars, pos) {
+    Some("[") -> {
+      // List type: [InnerType]
+      let #(inner_result, pos_after_inner) =
+        parse_type_string_helper(type_str, pos + 1)
+
+      case inner_result {
+        Ok(inner) -> {
+          // Expect closing ]
+          let pos = skip_whitespace(chars, pos_after_inner)
+          case list_at(chars, pos) {
+            Some("]") -> {
+              let pos = pos + 1
+              // Check for non-null marker
+              let pos_after_space = skip_whitespace(chars, pos)
+              case list_at(chars, pos_after_space) {
+                Some("!") -> #(
+                  Ok(schema.NonNullType(schema.ListType(inner))),
+                  pos_after_space + 1,
+                )
+                _ -> #(Ok(schema.ListType(inner)), pos)
+              }
+            }
+            _ -> #(
+              Error(error.InvalidGraphQLSyntax("type_string", 0, "Expected ']'")),
+              pos,
+            )
+          }
+        }
+        Error(e) -> #(Error(e), pos_after_inner)
+      }
     }
-    parser.NonNullTypeRef(inner) -> {
-      use inner_schema <- result.try(parser_type_to_schema_type(inner))
-      Ok(schema.NonNullType(inner_schema))
+
+    Some(char) -> {
+      case is_alpha(char) {
+        True -> {
+          // Named type
+          let #(name, pos_after_name) = read_name(chars, pos)
+
+          // Check for non-null marker
+          let pos_after_space = skip_whitespace(chars, pos_after_name)
+          case list_at(chars, pos_after_space) {
+            Some("!") -> #(
+              Ok(schema.NonNullType(schema.NamedType(name, schema.Scalar))),
+              pos_after_space + 1,
+            )
+            _ -> #(Ok(schema.NamedType(name, schema.Scalar)), pos_after_name)
+          }
+        }
+        False -> #(
+          Error(error.InvalidGraphQLSyntax("type_string", 0, "Invalid type")),
+          pos,
+        )
+      }
     }
+
+    None -> #(
+      Error(error.InvalidGraphQLSyntax("type_string", 0, "Invalid type")),
+      pos,
+    )
   }
 }
 
-// Convert parser TypeRef to schema TypeRef with schema lookup for accurate kinds
-pub fn parser_type_to_schema_type_with_schema(
-  parser_type: parser.TypeRef,
+fn skip_whitespace(chars: List(String), pos: Int) -> Int {
+  case list_at(chars, pos) {
+    Some(" ") | Some("\t") | Some("\n") | Some("\r") ->
+      skip_whitespace(chars, pos + 1)
+    _ -> pos
+  }
+}
+
+fn list_at(lst: List(a), index: Int) -> Option(a) {
+  lst
+  |> list.drop(index)
+  |> list.first
+  |> option.from_result
+}
+
+fn is_alpha(char: String) -> Bool {
+  case char {
+    "a"
+    | "b"
+    | "c"
+    | "d"
+    | "e"
+    | "f"
+    | "g"
+    | "h"
+    | "i"
+    | "j"
+    | "k"
+    | "l"
+    | "m"
+    | "n"
+    | "o"
+    | "p"
+    | "q"
+    | "r"
+    | "s"
+    | "t"
+    | "u"
+    | "v"
+    | "w"
+    | "x"
+    | "y"
+    | "z"
+    | "A"
+    | "B"
+    | "C"
+    | "D"
+    | "E"
+    | "F"
+    | "G"
+    | "H"
+    | "I"
+    | "J"
+    | "K"
+    | "L"
+    | "M"
+    | "N"
+    | "O"
+    | "P"
+    | "Q"
+    | "R"
+    | "S"
+    | "T"
+    | "U"
+    | "V"
+    | "W"
+    | "X"
+    | "Y"
+    | "Z"
+    | "_" -> True
+    _ -> False
+  }
+}
+
+fn is_alphanumeric(char: String) -> Bool {
+  is_alpha(char)
+  || case char {
+    "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" -> True
+    _ -> False
+  }
+}
+
+fn read_name(chars: List(String), pos: Int) -> #(String, Int) {
+  read_name_helper(chars, pos, "")
+}
+
+fn read_name_helper(
+  chars: List(String),
+  pos: Int,
+  acc: String,
+) -> #(String, Int) {
+  case list_at(chars, pos) {
+    Some(char) -> {
+      case is_alphanumeric(char) {
+        True -> read_name_helper(chars, pos + 1, acc <> char)
+        False -> #(acc, pos)
+      }
+    }
+    None -> #(acc, pos)
+  }
+}
+
+// Convert type string to schema TypeRef with schema lookup for accurate kinds
+pub fn parse_type_string_with_schema(
+  type_str: String,
   schema_types: dict.Dict(String, schema.Type),
 ) -> Result(schema.TypeRef, Error) {
-  case parser_type {
-    parser.NamedTypeRef(name) -> {
-      // Look up the type in schema to get the actual kind
+  use type_ref <- result.try(parse_type_string(type_str))
+
+  // Update the kind based on schema lookup
+  update_type_ref_kinds(type_ref, schema_types)
+}
+
+fn update_type_ref_kinds(
+  type_ref: schema.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
+) -> Result(schema.TypeRef, Error) {
+  case type_ref {
+    schema.NamedType(name, _) -> {
       let kind = case dict.get(schema_types, name) {
         Ok(schema.ScalarType(_, _)) -> schema.Scalar
         Ok(schema.ObjectType(_, _, _)) -> schema.Object
@@ -127,19 +301,13 @@ pub fn parser_type_to_schema_type_with_schema(
       }
       Ok(schema.NamedType(name, kind))
     }
-    parser.ListTypeRef(inner) -> {
-      use inner_schema <- result.try(parser_type_to_schema_type_with_schema(
-        inner,
-        schema_types,
-      ))
-      Ok(schema.ListType(inner_schema))
+    schema.ListType(inner) -> {
+      use updated_inner <- result.try(update_type_ref_kinds(inner, schema_types))
+      Ok(schema.ListType(updated_inner))
     }
-    parser.NonNullTypeRef(inner) -> {
-      use inner_schema <- result.try(parser_type_to_schema_type_with_schema(
-        inner,
-        schema_types,
-      ))
-      Ok(schema.NonNullType(inner_schema))
+    schema.NonNullType(inner) -> {
+      use updated_inner <- result.try(update_type_ref_kinds(inner, schema_types))
+      Ok(schema.NonNullType(updated_inner))
     }
   }
 }
