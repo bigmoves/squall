@@ -74,7 +74,7 @@ pub fn update_settings_response_to_json(input: UpdateSettingsResponse) -> json.J
 pub fn update_settings(client: squall.Client, input: SettingsInput) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "mutation UpdateSettings($input: SettingsInput!) { updateSettings(input: $input) { id metadata } }",
+    "\n    mutation UpdateSettings($input: SettingsInput!) {\n      updateSettings(input: $input) {\n        id\n        metadata\n      }\n    }\n  ",
     json.object([#("input", settings_input_to_json(input))]),
   )
 }

@@ -1,6 +1,6 @@
 ---
 version: 1.4.1
-title: Response serializer with optional fields
+title: Query with simple fragment spread
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
@@ -9,14 +9,20 @@ import squall
 import gleam/option.{type Option}
 
 pub type User {
-  User(id: String, name: Option(String), email: Option(String))
+  User(
+    id: String,
+    name: Option(String),
+    email: Option(String),
+    created_at: Option(String),
+  )
 }
 
 pub fn user_decoder() -> decode.Decoder(User) {
   use id <- decode.field("id", decode.string)
   use name <- decode.field("name", decode.optional(decode.string))
   use email <- decode.field("email", decode.optional(decode.string))
-  decode.success(User(id: id, name: name, email: email))
+  use created_at <- decode.field("createdAt", decode.optional(decode.string))
+  decode.success(User(id: id, name: name, email: email, created_at: created_at))
 }
 
 pub fn user_to_json(input: User) -> json.Json {
@@ -25,6 +31,7 @@ pub fn user_to_json(input: User) -> json.Json {
       #("id", json.string(input.id)),
       #("name", json.nullable(input.name, json.string)),
       #("email", json.nullable(input.email, json.string)),
+      #("createdAt", json.nullable(input.created_at, json.string)),
     ],
   )
 }
@@ -45,7 +52,7 @@ pub fn get_user_response_to_json(input: GetUserResponse) -> json.Json {
 pub fn get_user(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "\n    query GetUser {\n      user {\n        id\n        name\n        email\n      }\n    }\n  ",
+    "\n    fragment UserFields on User {\n      id\n      name\n      email\n    }\n\n    query GetUser {\n      user {\n        ...UserFields\n        createdAt\n      }\n    }\n  ",
     json.object([]),
   )
 }

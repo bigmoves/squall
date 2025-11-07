@@ -1,0 +1,15 @@
+fragment CharacterInfo on Character {
+  id
+  name
+  status
+  species
+}
+
+query GetCharacterWithFragment($id: ID!) {
+  character(id: $id) {
+    ...CharacterInfo
+    origin {
+      name
+    }
+  }
+}

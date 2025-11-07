@@ -6,6 +6,7 @@ import squall
 
 // Import the generated GraphQL code
 import graphql/get_character
+import graphql/get_character_with_fragment
 
 // For Erlang target (default)
 import gleam/httpc
@@ -16,7 +17,17 @@ import gleam/httpc
 
 pub fn main() {
   let client = squall.new("https://rickandmortyapi.com/graphql", [])
+
+  // Example 1: Simple query
+  io.println("=== Simple Query ===")
   let assert Ok(request) = get_character.get_character(client, "1")
+  let assert Ok(body) = send_erlang(request)
+  io.println(body)
+
+  // Example 2: Query with fragments
+  io.println("\n=== Query with Fragments ===")
+  let assert Ok(request) =
+    get_character_with_fragment.get_character_with_fragment(client, "1")
   let assert Ok(body) = send_erlang(request)
   io.println(body)
 }

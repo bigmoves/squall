@@ -50,7 +50,7 @@ pub fn get_episodes_response_to_json(input: GetEpisodesResponse) -> json.Json {
 pub fn get_episodes(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetEpisodes { episodesByIds(ids: [1, 2, 3]) { id name } }",
+    "\n    query GetEpisodes {\n      episodesByIds(ids: [1, 2, 3]) {\n        id\n        name\n      }\n    }\n  ",
     json.object([]),
   )
 }

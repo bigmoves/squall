@@ -47,7 +47,7 @@ pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json 
 pub fn get_character(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetCharacter { character(id: 1) { id name } }",
+    "\n    query GetCharacter {\n      character(id: 1) {\n        id\n        name\n      }\n    }\n  ",
     json.object([]),
   )
 }

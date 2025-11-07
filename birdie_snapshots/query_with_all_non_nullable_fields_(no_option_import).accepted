@@ -44,7 +44,7 @@ pub fn get_product_response_to_json(input: GetProductResponse) -> json.Json {
 pub fn get_product(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetProduct { product { id name price } }",
+    "\n    query GetProduct {\n      product {\n        id\n        name\n        price\n      }\n    }\n  ",
     json.object([]),
   )
 }

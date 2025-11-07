@@ -88,7 +88,7 @@ pub fn create_profile_response_to_json(input: CreateProfileResponse) -> json.Jso
 pub fn create_profile(client: squall.Client, input: ProfileInput) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "mutation CreateProfile($input: ProfileInput!) { createProfile(input: $input) { id displayName description } }",
+    "\n    mutation CreateProfile($input: ProfileInput!) {\n      createProfile(input: $input) {\n        id\n        displayName\n        description\n      }\n    }\n  ",
     json.object([#("input", profile_input_to_json(input))]),
   )
 }

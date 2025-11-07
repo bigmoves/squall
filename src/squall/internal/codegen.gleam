@@ -1,7 +1,7 @@
 import glam/doc.{type Document}
 import gleam/dict
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option
 import gleam/result
 import gleam/string
 import squall/internal/error.{type Error}
@@ -244,12 +244,29 @@ fn imports_doc(
 // Generate code for an operation
 pub fn generate_operation(
   operation_name: String,
+  source: String,
   operation: graphql_ast.Operation,
   schema_data: schema.Schema,
   _graphql_endpoint: String,
 ) -> Result(String, Error) {
-  // Extract selections
+  generate_operation_with_fragments(operation_name, source, operation, [], schema_data, "")
+}
+
+pub fn generate_operation_with_fragments(
+  operation_name: String,
+  source: String,
+  operation: graphql_ast.Operation,
+  fragments: List(graphql_ast.Operation),
+  schema_data: schema.Schema,
+  _graphql_endpoint: String,
+) -> Result(String, Error) {
+  // Extract selections and expand any fragments
   let selections = graphql_ast.get_selections(operation)
+
+  use expanded_selections <- result.try(graphql_ast.expand_fragments(
+    selections,
+    fragments,
+  ))
 
   // Determine root type based on operation type
   let root_type_name = case graphql_ast.get_operation_type(operation) {
@@ -275,12 +292,15 @@ pub fn generate_operation(
   // Generate response type
   let response_type_name = to_pascal_case(operation_name) <> "Response"
 
-  // Build field types from selections
-  use field_types <- result.try(collect_field_types(selections, root_type))
+  // Build field types from expanded selections
+  use field_types <- result.try(collect_field_types(
+    expanded_selections,
+    root_type,
+  ))
 
   // Collect nested types that need to be generated
   use nested_types <- result.try(collect_nested_types(
-    selections,
+    expanded_selections,
     root_type,
     schema_data,
   ))
@@ -348,13 +368,13 @@ pub fn generate_operation(
     })
     |> list.flatten
 
-  // Generate function
+  // Use the original source string directly (includes fragment definitions)
   let function_def =
     generate_function(
       operation_name,
       response_type_name,
       variables,
-      build_query_string(operation),
+      source,
       schema_data.types,
     )
 
@@ -1413,68 +1433,6 @@ fn encode_variable_value(
   }
 }
 
-fn build_query_string(operation: graphql_ast.Operation) -> String {
-  let op_type = case graphql_ast.get_operation_type(operation) {
-    graphql_ast.Query -> "query"
-    graphql_ast.Mutation -> "mutation"
-    graphql_ast.Subscription -> "subscription"
-  }
-
-  let op_name = case graphql_ast.get_operation_name(operation) {
-    Some(name) -> " " <> name
-    None -> ""
-  }
-
-  let variables = graphql_ast.get_variables(operation)
-  let var_defs = case variables {
-    [] -> ""
-    vars -> {
-      let defs =
-        vars
-        |> list.map(fn(var) {
-          "$"
-          <> graphql_ast.get_variable_name(var)
-          <> ": "
-          <> graphql_ast.get_variable_type_string(var)
-        })
-        |> string.join(", ")
-      "(" <> defs <> ")"
-    }
-  }
-
-  let selections = graphql_ast.get_selections(operation)
-  let selection_set = build_selection_set(selections)
-
-  op_type <> op_name <> var_defs <> " " <> selection_set
-}
-
-fn build_selection_set(selections: List(graphql_ast.Selection)) -> String {
-  let fields =
-    selections
-    |> list.filter(fn(selection) {
-      case selection {
-        parser.Field(_, _, _, _) -> True
-        parser.FragmentSpread(_) | parser.InlineFragment(_, _) -> False
-      }
-    })
-    |> list.map(fn(selection) {
-      case selection {
-        parser.Field(name, _alias, args, nested) -> {
-          let args_str = format_arguments(args)
-          case nested {
-            [] -> name <> args_str
-            subs -> name <> args_str <> " " <> build_selection_set(subs)
-          }
-        }
-        _ -> ""
-        // This should never happen due to the filter above
-      }
-    })
-    |> string.join(" ")
-
-  "{ " <> fields <> " }"
-}
-
 // Helper functions
 
 fn capitalize(s: String) -> String {
@@ -1489,52 +1447,6 @@ fn to_pascal_case(s: String) -> String {
   |> string.split("_")
   |> list.map(capitalize)
   |> string.join("")
-}
-
-fn format_value(value: parser.ArgumentValue) -> String {
-  case value {
-    parser.IntValue(i) -> i
-    parser.FloatValue(f) -> f
-    parser.StringValue(s) -> "\"" <> s <> "\""
-    parser.BooleanValue(True) -> "true"
-    parser.BooleanValue(False) -> "false"
-    parser.NullValue -> "null"
-    parser.EnumValue(name) -> name
-    parser.VariableValue(name) -> "$" <> name
-    parser.ListValue(values) -> {
-      let formatted_values =
-        values
-        |> list.map(format_value)
-        |> string.join(", ")
-      "[" <> formatted_values <> "]"
-    }
-    parser.ObjectValue(fields) -> {
-      let formatted_fields =
-        fields
-        |> list.map(fn(field) {
-          let #(name, value) = field
-          name <> ": " <> format_value(value)
-        })
-        |> string.join(", ")
-      "{ " <> formatted_fields <> " }"
-    }
-  }
-}
-
-fn format_arguments(arguments: List(parser.Argument)) -> String {
-  case arguments {
-    [] -> ""
-    args -> {
-      let formatted_args =
-        args
-        |> list.map(fn(arg) {
-          let parser.Argument(name, value) = arg
-          name <> ": " <> format_value(value)
-        })
-        |> string.join(", ")
-      "(" <> formatted_args <> ")"
-    }
-  }
 }
 
 fn snake_case(s: String) -> String {

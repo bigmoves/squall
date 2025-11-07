@@ -49,7 +49,7 @@ pub fn get_profile_response_to_json(input: GetProfileResponse) -> json.Json {
 pub fn get_profile(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetProfile { profile { id displayName description } }",
+    "\n    query GetProfile {\n      profile {\n        id\n        displayName\n        description\n      }\n    }\n  ",
     json.object([]),
   )
 }
