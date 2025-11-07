@@ -206,7 +206,8 @@ fn generate(endpoint: String) {
                 // Extract main operation and fragments
                 case graphql_ast.get_main_operation(document) {
                   Ok(operation) -> {
-                    let fragments = graphql_ast.get_fragment_definitions(document)
+                    let fragments =
+                      graphql_ast.get_fragment_definitions(document)
 
                     case
                       codegen.generate_operation_with_fragments(
