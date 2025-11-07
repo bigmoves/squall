@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Mutation function generation
-file: ./test/codegen_test.gleam
-test_name: generate_mutation_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -41,12 +40,15 @@ pub fn create_user_response_to_json(input: CreateUserResponse) -> json.Json {
   json.object([#("createUser", json.nullable(input.create_user, user_to_json))])
 }
 
-pub fn create_user(client: squall.Client, name: String) {
-  squall.execute_query(
+pub fn create_user(client: squall.Client, name: String) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }",
     json.object([#("name", json.string(name))]),
-    create_user_response_decoder(),
   )
+}
+
+pub fn parse_create_user_response(body: String) -> Result(CreateUserResponse, String) {
+  squall.parse_response(body, create_user_response_decoder())
 }
 

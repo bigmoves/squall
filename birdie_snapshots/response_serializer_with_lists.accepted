@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Response serializer with lists
-file: ./test/codegen_test.gleam
-test_name: generate_response_serializer_with_lists_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -48,12 +47,15 @@ pub fn get_users_response_to_json(input: GetUsersResponse) -> json.Json {
   )
 }
 
-pub fn get_users(client: squall.Client) {
-  squall.execute_query(
+pub fn get_users(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetUsers { users { id name } }",
     json.object([]),
-    get_users_response_decoder(),
   )
+}
+
+pub fn parse_get_users_response(body: String) -> Result(GetUsersResponse, String) {
+  squall.parse_response(body, get_users_response_decoder())
 }
 

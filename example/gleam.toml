@@ -1,0 +1,17 @@
+name = "example"
+version = "1.0.0"
+
+[dependencies]
+gleam_stdlib = ">= 0.34.0 and < 2.0.0"
+gleam_json = ">= 3.0.0 and < 4.0.0"
+gleam_http = ">= 4.3.0 and < 5.0.0"
+squall = { path = "../" }
+
+# For Erlang target (default)
+gleam_httpc = ">= 5.0.0 and < 6.0.0"
+
+# For JavaScript target: comment out httpc above and uncomment this
+# gleam_fetch = ">= 1.0.0 and < 2.0.0"
+
+[dev-dependencies]
+gleeunit = ">= 1.0.0 and < 2.0.0"

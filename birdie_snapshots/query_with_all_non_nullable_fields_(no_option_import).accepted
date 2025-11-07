@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Query with all non-nullable fields (no Option import)
-file: ./test/codegen_test.gleam
-test_name: generate_query_with_all_non_nullable_fields_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 
@@ -42,12 +41,15 @@ pub fn get_product_response_to_json(input: GetProductResponse) -> json.Json {
   json.object([#("product", product_to_json(input.product))])
 }
 
-pub fn get_product(client: squall.Client) {
-  squall.execute_query(
+pub fn get_product(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetProduct { product { id name price } }",
     json.object([]),
-    get_product_response_decoder(),
   )
+}
+
+pub fn parse_get_product_response(body: String) -> Result(GetProductResponse, String) {
+  squall.parse_response(body, get_product_response_decoder())
 }
 

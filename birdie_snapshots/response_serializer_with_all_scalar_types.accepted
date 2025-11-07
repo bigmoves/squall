@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Response serializer with all scalar types
-file: ./test/codegen_test.gleam
-test_name: generate_response_serializer_with_all_scalars_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -64,12 +63,15 @@ pub fn get_product_response_to_json(input: GetProductResponse) -> json.Json {
   json.object([#("product", json.nullable(input.product, product_to_json))])
 }
 
-pub fn get_product(client: squall.Client) {
-  squall.execute_query(
+pub fn get_product(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetProduct { product { id name price inStock rating metadata } }",
     json.object([]),
-    get_product_response_decoder(),
   )
+}
+
+pub fn parse_get_product_response(body: String) -> Result(GetProductResponse, String) {
+  squall.parse_response(body, get_product_response_decoder())
 }
 

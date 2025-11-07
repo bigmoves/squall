@@ -211,6 +211,7 @@ fn imports_doc(
   // Minimal imports - just what we need for decoders and the squall client
   let core_imports = [
     "import gleam/dynamic/decode",
+    "import gleam/http/request.{type Request}",
     "import gleam/json",
     "import squall",
   ]
@@ -1195,10 +1196,32 @@ fn encode_response_field_value(
   }
 }
 
-// Generate function
+// Generate two functions: one to prepare the request, one to parse the response
 fn generate_function(
   operation_name: String,
   response_type_name: String,
+  variables: List(graphql_ast.Variable),
+  query_string: String,
+  schema_types: dict.Dict(String, schema.Type),
+) -> Document {
+  // Generate the prepare request function
+  let prepare_function = generate_prepare_function(
+    operation_name,
+    variables,
+    query_string,
+    schema_types,
+  )
+
+  // Generate the parse response function
+  let parse_function = generate_parse_function(operation_name, response_type_name)
+
+  // Combine both functions with a line break
+  doc.concat([prepare_function, doc.lines(2), parse_function])
+}
+
+// Generate the function that prepares the HTTP request
+fn generate_prepare_function(
+  operation_name: String,
   variables: List(graphql_ast.Variable),
   query_string: String,
   schema_types: dict.Dict(String, schema.Type),
@@ -1270,21 +1293,42 @@ fn generate_function(
     }
   }
 
-  // Build simplified function body that just calls squall.execute_query
+  // Build function body that calls squall.prepare_request
   let body_doc =
-    call_doc("squall.execute_query", [
+    call_doc("squall.prepare_request", [
       doc.from_string("client"),
       string_doc(query_string),
       variables_code,
-      doc.from_string(snake_case(response_type_name) <> "_decoder()"),
     ])
 
-  // Build function signature
-  // The return type is handled by squall.execute_query (Promise on JS, Result on Erlang)
+  // Build function signature with explicit return type
   doc.concat([
     doc.from_string("pub fn " <> function_name),
     comma_list("(", param_docs, ")"),
-    doc.from_string(" "),
+    doc.from_string(" -> Result(Request(String), String) "),
+    block([body_doc]),
+  ])
+}
+
+// Generate the function that parses the response body
+fn generate_parse_function(
+  operation_name: String,
+  response_type_name: String,
+) -> Document {
+  let function_name = "parse_" <> operation_name <> "_response"
+  let decoder_name = snake_case(response_type_name) <> "_decoder"
+
+  let body_doc =
+    call_doc("squall.parse_response", [
+      doc.from_string("body"),
+      doc.from_string(decoder_name <> "()"),
+    ])
+
+  doc.concat([
+    doc.from_string("pub fn " <> function_name),
+    doc.from_string("(body: String) -> Result("),
+    doc.from_string(response_type_name),
+    doc.from_string(", String) "),
     block([body_doc]),
   ])
 }

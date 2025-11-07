@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Type with reserved keywords
-file: ./test/codegen_test.gleam
-test_name: generate_with_reserved_keywords_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -50,12 +49,15 @@ pub fn get_item_response_to_json(input: GetItemResponse) -> json.Json {
   json.object([#("item", json.nullable(input.item, item_to_json))])
 }
 
-pub fn get_item(client: squall.Client) {
-  squall.execute_query(
+pub fn get_item(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetItem { item { id type case let } }",
     json.object([]),
-    get_item_response_decoder(),
   )
+}
+
+pub fn parse_get_item_response(body: String) -> Result(GetItemResponse, String) {
+  squall.parse_response(body, get_item_response_decoder())
 }
 

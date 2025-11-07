@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Query with multiple root fields and mixed arguments
-file: ./test/codegen_test.gleam
-test_name: generate_multiple_root_fields_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -115,12 +114,15 @@ pub fn multi_query_response_to_json(input: MultiQueryResponse) -> json.Json {
   )
 }
 
-pub fn multi_query(client: squall.Client) {
-  squall.execute_query(
+pub fn multi_query(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }",
     json.object([]),
-    multi_query_response_decoder(),
   )
+}
+
+pub fn parse_multi_query_response(body: String) -> Result(MultiQueryResponse, String) {
+  squall.parse_response(body, multi_query_response_decoder())
 }
 
