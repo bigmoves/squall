@@ -73,7 +73,7 @@ pub fn update_profile_response_to_json(input: UpdateProfileResponse) -> json.Jso
 pub fn update_profile(client: squall.Client, input: ProfileInput) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "mutation UpdateProfile($input: ProfileInput!) { updateProfile(input: $input) { id displayName } }",
+    "\n    mutation UpdateProfile($input: ProfileInput!) {\n      updateProfile(input: $input) {\n        id\n        displayName\n      }\n    }\n  ",
     json.object([#("input", profile_input_to_json(input))]),
   )
 }

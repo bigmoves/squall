@@ -117,7 +117,7 @@ pub fn multi_query_response_to_json(input: MultiQueryResponse) -> json.Json {
 pub fn multi_query(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query MultiQuery { characters(page: 2, filter: { name: \"rick\" }) { info { count } results { name } } location(id: 1) { id } episodesByIds(ids: [1, 2]) { id } }",
+    "\n    query MultiQuery {\n      characters(page: 2, filter: { name: \"rick\" }) {\n        info {\n          count\n        }\n        results {\n          name\n        }\n      }\n      location(id: 1) {\n        id\n      }\n      episodesByIds(ids: [1, 2]) {\n        id\n      }\n    }\n  ",
     json.object([]),
   )
 }

@@ -43,7 +43,7 @@ pub fn create_user_response_to_json(input: CreateUserResponse) -> json.Json {
 pub fn create_user(client: squall.Client, name: String) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "mutation CreateUser($name: String!) { createUser(name: $name) { id name } }",
+    "\n    mutation CreateUser($name: String!) {\n      createUser(name: $name) {\n        id\n        name\n      }\n    }\n  ",
     json.object([#("name", json.string(name))]),
   )
 }

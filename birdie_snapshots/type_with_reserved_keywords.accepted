@@ -52,7 +52,7 @@ pub fn get_item_response_to_json(input: GetItemResponse) -> json.Json {
 pub fn get_item(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetItem { item { id type case let } }",
+    "\n    query GetItem {\n      item {\n        id\n        type\n        case\n        let\n      }\n    }\n  ",
     json.object([]),
   )
 }

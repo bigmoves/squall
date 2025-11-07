@@ -43,7 +43,7 @@ pub fn get_user_response_to_json(input: GetUserResponse) -> json.Json {
 pub fn get_user(client: squall.Client, id: String) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetUser($id: ID!) { user(id: $id) { id name } }",
+    "\n    query GetUser($id: ID!) {\n      user(id: $id) {\n        id\n        name\n      }\n    }\n  ",
     json.object([#("id", json.string(id))]),
   )
 }

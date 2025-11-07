@@ -2,6 +2,8 @@
 
 A type-safe **sans-io** GraphQL client generator for Gleam.
 
+![Squall](https://images.unsplash.com/photo-1698115989309-16f9d34c04e9?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2340)
+
 > This project is in early development and may contain bugs/unsupported GraphQL queries.
 
 ## What is Sans-IO?
@@ -131,15 +133,8 @@ gleam run -m squall generate https://rickandmortyapi.com/graphql
 
 See the [example/](./example/) directory for a complete working example.
 
-## Inspiration
-
-- [bucket](https://github.com/lpil/bucket) - Gleam S3 client with sans-io pattern
-- [squirrel](https://github.com/giacomocavalieri/squirrel) - Original GraphQL client for Gleam
-- [Sans-IO pattern](https://sans-io.readthedocs.io/)
-
 ## Roadmap
 
-- [ ] Fragment support
 - [ ] Directive handling (`@include`, `@skip`)
 - [ ] Custom scalar type mapping
 - [ ] Schema caching

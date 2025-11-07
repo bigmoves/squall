@@ -201,34 +201,46 @@ fn generate(endpoint: String) {
           list.each(files, fn(file) {
             io.println("📝 Processing: " <> file.path)
 
-            case graphql_ast.parse(file.content) {
-              Ok(operation) -> {
-                case
-                  codegen.generate_operation(
-                    file.operation_name,
-                    operation,
-                    schema_data,
-                    endpoint,
-                  )
-                {
-                  Ok(code) -> {
-                    // Write generated code
-                    let output_path =
-                      string.replace(file.path, ".gql", ".gleam")
+            case graphql_ast.parse_document(file.content) {
+              Ok(document) -> {
+                // Extract main operation and fragments
+                case graphql_ast.get_main_operation(document) {
+                  Ok(operation) -> {
+                    let fragments = graphql_ast.get_fragment_definitions(document)
 
-                    case simplifile.write(output_path, code) {
-                      Ok(_) -> {
-                        io.println("  ✓ Generated: " <> output_path)
+                    case
+                      codegen.generate_operation_with_fragments(
+                        file.operation_name,
+                        file.content,
+                        operation,
+                        fragments,
+                        schema_data,
+                        endpoint,
+                      )
+                    {
+                      Ok(code) -> {
+                        // Write generated code
+                        let output_path =
+                          string.replace(file.path, ".gql", ".gleam")
+
+                        case simplifile.write(output_path, code) {
+                          Ok(_) -> {
+                            io.println("  ✓ Generated: " <> output_path)
+                          }
+                          Error(_) -> {
+                            io.println("  ✗ Failed to write: " <> output_path)
+                          }
+                        }
                       }
-                      Error(_) -> {
-                        io.println("  ✗ Failed to write: " <> output_path)
+                      Error(err) -> {
+                        io.println(
+                          "  ✗ Code generation failed: " <> error.to_string(err),
+                        )
                       }
                     }
                   }
                   Error(err) -> {
-                    io.println(
-                      "  ✗ Code generation failed: " <> error.to_string(err),
-                    )
+                    io.println("  ✗ Parse failed: " <> error.to_string(err))
                   }
                 }
               }
