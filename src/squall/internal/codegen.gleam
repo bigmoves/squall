@@ -249,7 +249,14 @@ pub fn generate_operation(
   schema_data: schema.Schema,
   _graphql_endpoint: String,
 ) -> Result(String, Error) {
-  generate_operation_with_fragments(operation_name, source, operation, [], schema_data, "")
+  generate_operation_with_fragments(
+    operation_name,
+    source,
+    operation,
+    [],
+    schema_data,
+    "",
+  )
 }
 
 pub fn generate_operation_with_fragments(
@@ -1225,15 +1232,17 @@ fn generate_function(
   schema_types: dict.Dict(String, schema.Type),
 ) -> Document {
   // Generate the prepare request function
-  let prepare_function = generate_prepare_function(
-    operation_name,
-    variables,
-    query_string,
-    schema_types,
-  )
+  let prepare_function =
+    generate_prepare_function(
+      operation_name,
+      variables,
+      query_string,
+      schema_types,
+    )
 
   // Generate the parse response function
-  let parse_function = generate_parse_function(operation_name, response_type_name)
+  let parse_function =
+    generate_parse_function(operation_name, response_type_name)
 
   // Combine both functions with a line break
   doc.concat([prepare_function, doc.lines(2), parse_function])

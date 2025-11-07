@@ -56,7 +56,13 @@ pub fn generate_simple_query_test() {
     )
 
   let result =
-    codegen.generate_operation("get_user", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_user",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -123,7 +129,13 @@ pub fn generate_query_with_variables_test() {
     )
 
   let result =
-    codegen.generate_operation("get_user", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_user",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -202,7 +214,13 @@ pub fn generate_query_with_nested_types_test() {
     )
 
   let result =
-    codegen.generate_operation("get_character", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_character",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -274,7 +292,13 @@ pub fn generate_mutation_test() {
     )
 
   let result =
-    codegen.generate_operation("create_user", mutation_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "create_user",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -339,7 +363,13 @@ pub fn generate_with_reserved_keywords_test() {
     )
 
   let result =
-    codegen.generate_operation("get_item", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_item",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -411,7 +441,13 @@ pub fn generate_inline_scalar_arguments_test() {
     )
 
   let result =
-    codegen.generate_operation("get_character", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_character",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -498,7 +534,13 @@ pub fn generate_inline_object_arguments_test() {
     )
 
   let result =
-    codegen.generate_operation("get_characters", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_characters",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -572,7 +614,13 @@ pub fn generate_inline_array_arguments_test() {
     )
 
   let result =
-    codegen.generate_operation("get_episodes", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_episodes",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -703,7 +751,13 @@ pub fn generate_multiple_root_fields_test() {
     )
 
   let result =
-    codegen.generate_operation("multi_query", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "multi_query",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -798,7 +852,13 @@ pub fn generate_mutation_with_input_object_test() {
     )
 
   let result =
-    codegen.generate_operation("update_profile", mutation_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "update_profile",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -915,7 +975,13 @@ pub fn generate_mutation_with_nested_input_object_test() {
     )
 
   let result =
-    codegen.generate_operation("update_profile", mutation_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "update_profile",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -989,7 +1055,13 @@ pub fn generate_query_with_all_non_nullable_fields_test() {
     )
 
   let result =
-    codegen.generate_operation("get_product", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_product",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1060,7 +1132,13 @@ pub fn generate_query_with_json_scalar_test() {
     )
 
   let result =
-    codegen.generate_operation("get_profile", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_profile",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1144,7 +1222,13 @@ pub fn generate_mutation_with_json_input_field_test() {
     )
 
   let result =
-    codegen.generate_operation("update_settings", mutation_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "update_settings",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1245,7 +1329,13 @@ pub fn generate_mutation_with_optional_input_fields_test() {
     )
 
   let result =
-    codegen.generate_operation("create_profile", mutation_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "create_profile",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1321,7 +1411,13 @@ pub fn generate_query_with_optional_response_fields_test() {
     )
 
   let result =
-    codegen.generate_operation("get_profile", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_profile",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1390,7 +1486,13 @@ pub fn generate_response_serializer_simple_test() {
     )
 
   let result =
-    codegen.generate_operation("get_user", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_user",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1454,7 +1556,13 @@ pub fn generate_response_serializer_with_optional_fields_test() {
     )
 
   let result =
-    codegen.generate_operation("get_user", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_user",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1537,7 +1645,13 @@ pub fn generate_response_serializer_with_nested_types_test() {
     )
 
   let result =
-    codegen.generate_operation("get_user", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_user",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1604,7 +1718,13 @@ pub fn generate_response_serializer_with_lists_test() {
     )
 
   let result =
-    codegen.generate_operation("get_users", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_users",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
@@ -1695,7 +1815,13 @@ pub fn generate_response_serializer_with_all_scalars_test() {
     )
 
   let result =
-    codegen.generate_operation("get_product", query_source, operation, mock_schema, "")
+    codegen.generate_operation(
+      "get_product",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
 
   case result {
     Ok(code) -> {
