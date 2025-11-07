@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Query with inline scalar arguments
-file: ./test/codegen_test.gleam
-test_name: generate_inline_scalar_arguments_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -45,12 +44,15 @@ pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json 
   )
 }
 
-pub fn get_character(client: squall.Client) {
-  squall.execute_query(
+pub fn get_character(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetCharacter { character(id: 1) { id name } }",
     json.object([]),
-    get_character_response_decoder(),
   )
+}
+
+pub fn parse_get_character_response(body: String) -> Result(GetCharacterResponse, String) {
+  squall.parse_response(body, get_character_response_decoder())
 }
 

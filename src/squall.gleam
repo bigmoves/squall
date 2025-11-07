@@ -1,14 +1,13 @@
 import argv
 import gleam/dynamic/decode
 import gleam/http
-import gleam/http/request
+import gleam/http/request.{type Request}
 import gleam/httpc
 import gleam/io
 import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
-import squall/adapter.{type HttpAdapter}
 
 @target(erlang)
 import simplifile
@@ -28,163 +27,60 @@ import squall/internal/graphql_ast
 @target(erlang)
 import squall/internal/schema
 
-@target(erlang)
-import squall/adapter/erlang
-
-@target(javascript)
-import squall/adapter/javascript
-
-@target(javascript)
-import gleam/javascript/promise.{type Promise}
-
-/// A GraphQL client with endpoint, headers, and HTTP adapter configuration
+/// A GraphQL client with endpoint and headers configuration.
+/// This client follows the sans-io pattern: it builds HTTP requests but doesn't send them.
+/// You must use your own HTTP client to send the requests.
 pub type Client {
-  Client(
-    endpoint: String,
-    headers: List(#(String, String)),
-    send_request: HttpAdapter,
-  )
+  Client(endpoint: String, headers: List(#(String, String)))
 }
 
-/// Create a new GraphQL client with custom headers and HTTP adapter.
-/// For most cases, use target-specific constructors like `new_erlang_client` or `new_javascript_client`.
-pub fn new_client(
-  endpoint: String,
-  headers: List(#(String, String)),
-  send_request: HttpAdapter,
-) -> Client {
-  Client(endpoint: endpoint, headers: headers, send_request: send_request)
+/// Create a new GraphQL client with custom headers.
+///
+/// ## Example
+///
+/// ```gleam
+/// let client = squall.new("https://api.example.com/graphql", [])
+/// ```
+pub fn new(endpoint: String, headers: List(#(String, String))) -> Client {
+  Client(endpoint: endpoint, headers: headers)
 }
 
-/// Create a new GraphQL client with bearer token authentication and HTTP adapter.
-pub fn new_client_with_auth(
-  endpoint: String,
-  token: String,
-  send_request: HttpAdapter,
-) -> Client {
-  Client(
-    endpoint: endpoint,
-    headers: [#("Authorization", "Bearer " <> token)],
-    send_request: send_request,
-  )
+/// Create a new GraphQL client with bearer token authentication.
+///
+/// ## Example
+///
+/// ```gleam
+/// let client = squall.new_with_auth("https://api.example.com/graphql", "my-token")
+/// ```
+pub fn new_with_auth(endpoint: String, token: String) -> Client {
+  Client(endpoint: endpoint, headers: [#("Authorization", "Bearer " <> token)])
 }
 
-@target(erlang)
-/// Create a new Erlang GraphQL client with custom headers.
-/// This uses the Erlang HTTP adapter (gleam_httpc).
-pub fn new_erlang_client(
-  endpoint: String,
-  headers: List(#(String, String)),
-) -> Client {
-  Client(endpoint: endpoint, headers: headers, send_request: erlang.adapter())
-}
-
-@target(erlang)
-/// Create a new Erlang GraphQL client with bearer token authentication.
-pub fn new_erlang_client_with_auth(endpoint: String, token: String) -> Client {
-  Client(
-    endpoint: endpoint,
-    headers: [#("Authorization", "Bearer " <> token)],
-    send_request: erlang.adapter(),
-  )
-}
-
-@target(javascript)
-/// Create a new JavaScript GraphQL client with custom headers.
-/// This uses the JavaScript HTTP adapter (Fetch API).
-pub fn new_javascript_client(
-  endpoint: String,
-  headers: List(#(String, String)),
-) -> Client {
-  Client(
-    endpoint: endpoint,
-    headers: headers,
-    send_request: javascript.adapter(),
-  )
-}
-
-@target(javascript)
-/// Create a new JavaScript GraphQL client with bearer token authentication.
-pub fn new_javascript_client_with_auth(
-  endpoint: String,
-  token: String,
-) -> Client {
-  Client(
-    endpoint: endpoint,
-    headers: [#("Authorization", "Bearer " <> token)],
-    send_request: javascript.adapter(),
-  )
-}
-
-@target(javascript)
-/// Execute a GraphQL query on JavaScript targets.
-/// Returns a Promise that resolves to a Result containing the decoded response.
-pub fn execute_query(
+/// Prepare an HTTP request for a GraphQL query.
+/// This function builds the request but does not send it.
+/// You must send the request using your own HTTP client.
+///
+/// ## Example
+///
+/// ```gleam
+/// let client = squall.new("https://api.example.com/graphql", [])
+/// let request = squall.prepare_request(
+///   client,
+///   "query { users { id name } }",
+///   json.object([]),
+/// )
+///
+/// // Send with your HTTP client (Erlang example)
+/// let assert Ok(response) = httpc.send(request)
+///
+/// // Parse the response
+/// let assert Ok(data) = squall.parse_response(response.body, your_decoder)
+/// ```
+pub fn prepare_request(
   client: Client,
   query: String,
   variables: json.Json,
-  decoder: decode.Decoder(a),
-) -> Promise(Result(a, String)) {
-  let body =
-    json.object([#("query", json.string(query)), #("variables", variables)])
-
-  // Build the request
-  let req_result =
-    request.to(client.endpoint)
-    |> result.map_error(fn(_) { "Invalid endpoint URL" })
-    |> result.map(fn(req) {
-      req
-      |> request.set_method(http.Post)
-      |> request.set_body(json.to_string(body))
-      |> request.set_header("content-type", "application/json")
-    })
-    |> result.map(fn(req) {
-      list.fold(client.headers, req, fn(r, header) {
-        request.set_header(r, header.0, header.1)
-      })
-    })
-
-  // Convert Result to Promise
-  case req_result {
-    Error(e) -> promise.resolve(Error(e))
-    Ok(req) -> {
-      // Send request and process response
-      client.send_request(req)
-      |> promise.map(result.map_error(_, fn(_) { "HTTP request failed" }))
-      |> promise.try_await(fn(resp) {
-        // Parse JSON
-        let json_result =
-          json.parse(from: resp.body, using: decode.dynamic)
-          |> result.map_error(fn(_) { "Failed to decode JSON response" })
-
-        case json_result {
-          Error(e) -> promise.resolve(Error(e))
-          Ok(json_value) -> {
-            // Decode response
-            let data_decoder = {
-              use data <- decode.field("data", decoder)
-              decode.success(data)
-            }
-
-            decode.run(json_value, data_decoder)
-            |> result.map_error(fn(_) { "Failed to decode response data" })
-            |> promise.resolve
-          }
-        }
-      })
-    }
-  }
-}
-
-@target(erlang)
-/// Execute a GraphQL query on Erlang targets.
-/// Returns a Result containing the decoded response.
-pub fn execute_query(
-  client: Client,
-  query: String,
-  variables: json.Json,
-  decoder: decode.Decoder(a),
-) -> Result(a, String) {
+) -> Result(Request(String), String) {
   let body =
     json.object([#("query", json.string(query)), #("variables", variables)])
 
@@ -204,13 +100,28 @@ pub fn execute_query(
       request.set_header(r, header.0, header.1)
     })
 
-  use resp <- result.try(
-    client.send_request(req)
-    |> result.map_error(fn(_) { "HTTP request failed" }),
-  )
+  Ok(req)
+}
 
+/// Parse a GraphQL response body using the provided decoder.
+/// This function decodes the JSON response and extracts the data field.
+///
+/// ## Example
+///
+/// ```gleam
+/// let decoder = decode.field("users", decode.list(user_decoder))
+///
+/// case squall.parse_response(response_body, decoder) {
+///   Ok(users) -> io.println("Got users!")
+///   Error(err) -> io.println("Parse error: " <> err)
+/// }
+/// ```
+pub fn parse_response(
+  body: String,
+  decoder: decode.Decoder(a),
+) -> Result(a, String) {
   use json_value <- result.try(
-    json.parse(from: resp.body, using: decode.dynamic)
+    json.parse(from: body, using: decode.dynamic)
     |> result.map_error(fn(_) { "Failed to decode JSON response" }),
   )
 

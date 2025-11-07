@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Query with inline object arguments
-file: ./test/codegen_test.gleam
-test_name: generate_inline_object_arguments_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option}
@@ -65,12 +64,15 @@ pub fn get_characters_response_to_json(input: GetCharactersResponse) -> json.Jso
   )
 }
 
-pub fn get_characters(client: squall.Client) {
-  squall.execute_query(
+pub fn get_characters(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "query GetCharacters { characters(filter: { name: \"rick\", status: \"alive\" }) { results { id name } } }",
     json.object([]),
-    get_characters_response_decoder(),
   )
+}
+
+pub fn parse_get_characters_response(body: String) -> Result(GetCharactersResponse, String) {
+  squall.parse_response(body, get_characters_response_decoder())
 }
 

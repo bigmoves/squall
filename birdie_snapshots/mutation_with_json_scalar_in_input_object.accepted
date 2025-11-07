@@ -1,10 +1,9 @@
 ---
 version: 1.4.1
 title: Mutation with JSON scalar in InputObject
-file: ./test/codegen_test.gleam
-test_name: generate_mutation_with_json_input_field_test
 ---
 import gleam/dynamic/decode
+import gleam/http/request.{type Request}
 import gleam/json
 import squall
 import gleam/option.{type Option, Some, None}
@@ -72,12 +71,15 @@ pub fn update_settings_response_to_json(input: UpdateSettingsResponse) -> json.J
   )
 }
 
-pub fn update_settings(client: squall.Client, input: SettingsInput) {
-  squall.execute_query(
+pub fn update_settings(client: squall.Client, input: SettingsInput) -> Result(Request(String), String) {
+  squall.prepare_request(
     client,
     "mutation UpdateSettings($input: SettingsInput!) { updateSettings(input: $input) { id metadata } }",
     json.object([#("input", settings_input_to_json(input))]),
-    update_settings_response_decoder(),
   )
+}
+
+pub fn parse_update_settings_response(body: String) -> Result(UpdateSettingsResponse, String) {
+  squall.parse_response(body, update_settings_response_decoder())
 }
 
