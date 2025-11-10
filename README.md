@@ -131,7 +131,10 @@ gleam run -m squall generate https://rickandmortyapi.com/graphql
 
 ## Examples
 
-See the [example/](./example/) directory for a complete working example.
+See the [examples/](./examples/) directory for complete working examples:
+
+- **[01-basic](./examples/01-basic/)** - Basic usage with Erlang/JavaScript targets
+- **[02-lustre](./examples/02-lustre/)** - Frontend app using Lustre
 
 ## Roadmap
 
