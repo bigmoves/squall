@@ -2257,7 +2257,10 @@ pub fn generate_query_with_optional_enum_field_test() {
           "CharacterStatus",
           schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
         ),
-        #("Gender", schema.EnumType("Gender", ["Male", "Female", "Genderless"], None)),
+        #(
+          "Gender",
+          schema.EnumType("Gender", ["Male", "Female", "Genderless"], None),
+        ),
         #(
           "Query",
           schema.ObjectType(
@@ -2316,11 +2319,7 @@ pub fn generate_mutation_with_optional_enum_in_input_test() {
       schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
       None,
     ),
-    schema.InputValue(
-      "name",
-      schema.NamedType("String", schema.Scalar),
-      None,
-    ),
+    schema.InputValue("name", schema.NamedType("String", schema.Scalar), None),
     schema.InputValue(
       "status",
       schema.NamedType("CharacterStatus", schema.Enum),

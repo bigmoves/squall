@@ -1410,7 +1410,11 @@ fn encode_response_field_value(
           // List of Enums
           call_doc("json.array", [
             doc.from_string("from: " <> field_access),
-            doc.from_string("of: fn(v) { json.string(" <> snake_case(base_type_name) <> "_to_string(v)) }"),
+            doc.from_string(
+              "of: fn(v) { json.string("
+              <> snake_case(base_type_name)
+              <> "_to_string(v)) }",
+            ),
           ])
         }
         _ -> {
@@ -1448,7 +1452,9 @@ fn encode_response_field_value(
                     Ok(schema.ObjectType(_, _, _)) ->
                       snake_case(name) <> "_to_json"
                     Ok(schema.EnumType(_, _, _)) ->
-                      "fn(v) { json.string(" <> snake_case(name) <> "_to_string(v)) }"
+                      "fn(v) { json.string("
+                      <> snake_case(name)
+                      <> "_to_string(v)) }"
                     _ -> "json.string"
                   }
                 _ -> "json.string"
@@ -1477,7 +1483,11 @@ fn encode_response_field_value(
               // Optional Enum
               call_doc("json.nullable", [
                 doc.from_string(field_access),
-                doc.from_string("fn(v) { json.string(" <> snake_case(base_type_name) <> "_to_string(v)) }"),
+                doc.from_string(
+                  "fn(v) { json.string("
+                  <> snake_case(base_type_name)
+                  <> "_to_string(v)) }",
+                ),
               ])
             }
             _ -> {
