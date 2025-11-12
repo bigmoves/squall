@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with inline scalar arguments
+file: ./test/codegen_test.gleam
+test_name: generate_inline_scalar_arguments_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

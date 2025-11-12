@@ -1,13 +1,19 @@
-import argv
 import gleam/dynamic/decode
 import gleam/http
 import gleam/http/request.{type Request}
-import gleam/httpc
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/result
 import gleam/string
+
+@target(erlang)
+import argv
+
+@target(erlang)
+import gleam/io
+
+@target(erlang)
+import gleam/httpc
 
 @target(erlang)
 import simplifile
@@ -26,6 +32,15 @@ import squall/internal/graphql_ast
 
 @target(erlang)
 import squall/internal/schema
+
+@target(erlang)
+import squall/internal/query_extractor
+
+@target(erlang)
+import squall/internal/registry_codegen
+
+@target(erlang)
+import squall/internal/typename_injector
 
 /// A GraphQL client with endpoint and headers configuration.
 /// This client follows the sans-io pattern: it builds HTTP requests but doesn't send them.
@@ -131,7 +146,12 @@ pub fn parse_response(
   }
 
   decode.run(json_value, data_decoder)
-  |> result.map_error(fn(_) { "Failed to decode response data" })
+  |> result.map_error(fn(errors) {
+    "Failed to decode response data: "
+    <> string.inspect(errors)
+    <> ". Response body: "
+    <> body
+  })
 }
 
 @target(erlang)
@@ -139,6 +159,12 @@ pub fn main() {
   case argv.load().arguments {
     ["generate", endpoint] -> generate(endpoint)
     ["generate"] -> generate_with_env()
+    ["unstable-cache", endpoint] -> unstable_cache(endpoint)
+    ["unstable-cache"] -> {
+      io.println("Error: Endpoint required")
+      io.println("Usage: gleam run -m squall unstable-cache <endpoint>")
+      Nil
+    }
     _ -> {
       print_usage()
       Nil
@@ -154,25 +180,33 @@ Squall - Type-safe GraphQL client generator for Gleam
 
 Usage:
   gleam run -m squall generate <endpoint>
-  gleam run -m squall generate              # Uses GRAPHQL_ENDPOINT env var
+  gleam run -m squall unstable-cache <endpoint>
 
 Commands:
-  generate <endpoint>   Generate Gleam code from .gql files
+  generate <endpoint>            Generate Gleam code from .gql files
+  unstable-cache <endpoint>      Extract GraphQL queries from doc comments and generate types and cache registry
 
-The tool will:
+The generate command will:
   1. Find all .gql files in src/**/graphql/ directories
   2. Introspect the GraphQL schema from the endpoint
   3. Generate type-safe Gleam functions for each query/mutation/subscription
 
-Example:
+The unstable-cache command will:
+  1. Scan all .gleam files in src/ for GraphQL query blocks in doc comments
+  2. Introspect the GraphQL schema from the endpoint
+  3. Automatically inject __typename into queries for cache normalization
+  4. Generate type-safe code for each query at src/generated/queries/
+  5. Generate a registry initialization module at src/generated/queries.gleam
+
+Examples:
   gleam run -m squall generate https://rickandmortyapi.com/graphql
+  gleam run -m squall unstable-cache https://rickandmortyapi.com/graphql
 ",
   )
 }
 
 @target(erlang)
 fn generate_with_env() {
-  io.println("Error: GRAPHQL_ENDPOINT environment variable not set")
   io.println("Usage: gleam run -m squall generate <endpoint>")
   Nil
 }
@@ -394,6 +428,210 @@ fn make_graphql_request(
   }
 }
 
+@target(erlang)
+fn unstable_cache(endpoint: String) {
+  let queries_output_dir = "src/generated/queries"
+  let registry_output_path = "src/generated/queries.gleam"
+
+  io.println("🌊 Squall")
+  io.println("============================================\n")
+
+  io.println("🔍 Scanning for GraphQL queries in src/...")
+
+  // Scan for component files
+  case query_extractor.scan_component_files("src") {
+    Ok(files) -> {
+      io.println(
+        "✓ Found " <> int_to_string(list.length(files)) <> " .gleam file(s)\n",
+      )
+
+      // Extract queries from each file
+      io.println("📝 Extracting queries...")
+      let all_queries =
+        list.fold(files, [], fn(acc, file_path) {
+          case query_extractor.extract_from_file(file_path) {
+            Ok(queries) -> {
+              list.each(queries, fn(q) {
+                io.println("  ✓ Found: " <> q.name <> " in " <> file_path)
+              })
+              list.append(acc, queries)
+            }
+            Error(err) -> {
+              io.println(
+                "  ✗ Failed to extract from " <> file_path <> ": " <> err,
+              )
+              acc
+            }
+          }
+        })
+
+      case list.length(all_queries) {
+        0 -> {
+          io.println("\n⚠ No GraphQL queries found")
+          io.println(
+            "Add GraphQL query blocks to your doc comments with named operations",
+          )
+          Nil
+        }
+        _ -> {
+          io.println(
+            "\n✓ Extracted "
+            <> int_to_string(list.length(all_queries))
+            <> " quer"
+            <> case list.length(all_queries) {
+              1 -> "y"
+              _ -> "ies"
+            },
+          )
+
+          // Introspect schema
+          io.println("\n📡 Introspecting GraphQL schema from: " <> endpoint)
+          case introspect_schema(endpoint) {
+            Ok(schema_data) -> {
+              io.println("✓ Schema introspected successfully\n")
+
+              // Generate type-safe code for each query
+              io.println("🔧 Generating type-safe code...")
+              list.each(all_queries, fn(query_def) {
+                io.println("  • " <> query_def.name)
+
+                // Parse the GraphQL query
+                case graphql_ast.parse_document(query_def.query) {
+                  Ok(document) -> {
+                    case graphql_ast.get_main_operation(document) {
+                      Ok(operation) -> {
+                        let fragments =
+                          graphql_ast.get_fragment_definitions(document)
+
+                        // Generate code - convert query name to snake_case for module name
+                        let module_name = to_snake_case(query_def.name)
+
+                        case
+                          codegen.generate_operation_with_fragments(
+                            module_name,
+                            query_def.query,
+                            operation,
+                            fragments,
+                            schema_data,
+                            endpoint,
+                          )
+                        {
+                          Ok(code) -> {
+                            let file_name = module_name
+                            let module_path =
+                              queries_output_dir <> "/" <> file_name <> ".gleam"
+
+                            // Create directory if needed
+                            let _ =
+                              simplifile.create_directory_all(
+                                queries_output_dir,
+                              )
+
+                            case simplifile.write(module_path, code) {
+                              Ok(_) -> io.println("    ✓ " <> module_path)
+                              Error(_) ->
+                                io.println(
+                                  "    ✗ Failed to write " <> module_path,
+                                )
+                            }
+                          }
+                          Error(err) -> {
+                            io.println(
+                              "    ✗ Codegen failed: " <> error.to_string(err),
+                            )
+                          }
+                        }
+                      }
+                      Error(err) -> {
+                        io.println(
+                          "    ✗ Parse failed: " <> error.to_string(err),
+                        )
+                      }
+                    }
+                  }
+                  Error(err) -> {
+                    io.println("    ✗ Parse failed: " <> error.to_string(err))
+                  }
+                }
+              })
+
+              // Generate registry code with __typename injected
+              io.println("\n📦 Generating registry module...")
+              // Inject __typename into all query strings for the registry
+              let queries_with_typename =
+                list.map(all_queries, fn(query_def) {
+                  case
+                    typename_injector.inject_typename(
+                      query_def.query,
+                      schema_data,
+                    )
+                  {
+                    Ok(injected_query) ->
+                      query_extractor.QueryDefinition(
+                        name: query_def.name,
+                        query: injected_query,
+                        file_path: query_def.file_path,
+                      )
+                    Error(_) -> query_def
+                  }
+                })
+              let code =
+                registry_codegen.generate_registry_module(queries_with_typename)
+
+              // Write to output file
+              case simplifile.write(registry_output_path, code) {
+                Ok(_) -> {
+                  io.println("✓ Generated: " <> registry_output_path)
+                  io.println("\n✨ Code generation complete!")
+                  Nil
+                }
+                Error(_) -> {
+                  io.println("✗ Failed to write: " <> registry_output_path)
+                  Nil
+                }
+              }
+            }
+            Error(err) -> {
+              io.println(
+                "✗ Schema introspection failed: " <> error.to_string(err),
+              )
+              Nil
+            }
+          }
+        }
+      }
+    }
+    Error(err) -> {
+      io.println("✗ Failed to scan files: " <> err)
+      Nil
+    }
+  }
+}
+
+@target(erlang)
+fn to_snake_case(s: String) -> String {
+  // Simple conversion: GetCharacters -> get_characters
+  s
+  |> string.to_graphemes
+  |> list.index_fold([], fn(acc, char, index) {
+    case is_uppercase(char) {
+      True ->
+        case index {
+          0 -> list.append(acc, [string.lowercase(char)])
+          _ -> list.append(acc, ["_", string.lowercase(char)])
+        }
+      False -> list.append(acc, [char])
+    }
+  })
+  |> string.join("")
+}
+
+@target(erlang)
+fn is_uppercase(s: String) -> Bool {
+  s == string.uppercase(s) && s != string.lowercase(s)
+}
+
+@target(erlang)
 fn int_to_string(i: Int) -> String {
   case i {
     0 -> "0"

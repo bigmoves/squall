@@ -78,7 +78,7 @@ pub fn get_characters_response_to_json(
 pub fn get_characters(client: squall.Client) -> Result(Request(String), String) {
   squall.prepare_request(
     client,
-    "query GetCharacters {\n  characters {\n    results {\n      id\n      name\n      status\n      species\n    }\n  }\n}\n",
+    "query GetCharacters {\n    characters {\n        results {\n            id\n            name\n            status\n            species\n        }\n    }\n}\n",
     json.object([]),
   )
 }

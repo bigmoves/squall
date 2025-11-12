@@ -1,0 +1,97 @@
+---
+version: 1.4.1
+title: Mutation with optional enum in InputObject
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_with_optional_enum_in_input_test
+---
+import gleam/dynamic/decode
+import gleam/http/request.{type Request}
+import gleam/json
+import squall
+import gleam/option.{type Option, Some, None}
+import gleam/list
+
+pub type CharacterUpdateInput {
+  CharacterUpdateInput(
+    id: String,
+    name: Option(String),
+    status: Option(CharacterStatus),
+  )
+}
+
+fn character_update_input_to_json(input: CharacterUpdateInput) -> json.Json {
+  [Some(#("id", json.string(input.id))), {
+      case input.name {
+        Some(val) -> Some(#("name", json.string(val)))
+        None -> None
+      }
+    }, {
+      case input.status {
+        Some(val) -> Some(#("status", json.string(
+      character_status_to_string(val),
+    )))
+        None -> None
+      }
+    }]
+  |> list.filter_map(fn(x) {
+    case x {
+      Some(val) -> Ok(val)
+      None -> Error(Nil)
+    }
+  })
+  |> json.object
+}
+
+pub type Character {
+  Character(id: String, name: String, status: CharacterStatus)
+}
+
+pub fn character_decoder() -> decode.Decoder(Character) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  use status <- decode.field("status", character_status_decoder())
+  decode.success(Character(id: id, name: name, status: status))
+}
+
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+      #("status", json.string(character_status_to_string(input.status))),
+    ],
+  )
+}
+
+pub type UpdateCharacterResponse {
+  UpdateCharacterResponse(update_character: Option(Character))
+}
+
+pub fn update_character_response_decoder() -> decode.Decoder(UpdateCharacterResponse) {
+  use update_character <- decode.field("updateCharacter", decode.optional(character_decoder()))
+  decode.success(UpdateCharacterResponse(update_character: update_character))
+}
+
+pub fn update_character_response_to_json(input: UpdateCharacterResponse) -> json.Json {
+  json.object(
+    [
+      #("updateCharacter", json.nullable(
+        input.update_character,
+        character_to_json,
+      )),
+    ],
+  )
+}
+
+pub fn update_character(client: squall.Client, input: CharacterUpdateInput) -> Result(Request(String), String) {
+  squall.prepare_request(
+    client,
+    "\n    mutation UpdateCharacter($input: CharacterUpdateInput!) {\n      updateCharacter(input: $input) {\n        id\n        name\n        status\n      }\n    }\n  ",
+    json.object([#("input", character_update_input_to_json(input))]),
+  )
+}
+
+pub fn parse_update_character_response(body: String) -> Result(UpdateCharacterResponse, String) {
+  squall.parse_response(body, update_character_response_decoder())
+}
+

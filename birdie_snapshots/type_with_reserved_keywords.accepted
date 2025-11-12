@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Type with reserved keywords
+file: ./test/codegen_test.gleam
+test_name: generate_with_reserved_keywords_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

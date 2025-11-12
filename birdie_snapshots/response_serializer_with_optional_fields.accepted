@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Response serializer with optional fields
+file: ./test/codegen_test.gleam
+test_name: generate_response_serializer_with_optional_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

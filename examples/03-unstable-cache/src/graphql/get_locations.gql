@@ -1,0 +1,10 @@
+query GetLocations {
+  locations {
+    results {
+      id
+      name
+      type
+      dimension
+    }
+  }
+}

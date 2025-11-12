@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with optional response fields (no Some, None imports)
+file: ./test/codegen_test.gleam
+test_name: generate_query_with_optional_response_fields_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

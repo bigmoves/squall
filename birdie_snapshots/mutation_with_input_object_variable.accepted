@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Mutation with InputObject variable
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_with_input_object_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

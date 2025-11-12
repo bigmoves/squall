@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Mutation with JSON scalar in InputObject
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_with_json_input_field_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}

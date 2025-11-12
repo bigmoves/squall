@@ -1915,3 +1915,500 @@ pub fn generate_query_with_fragment_spread_test() {
     Error(_) -> Nil
   }
 }
+
+// Test: Generate query with enum field in response
+pub fn generate_query_with_enum_field_test() {
+  let query_source =
+    "
+    query GetCharacter {
+      character {
+        id
+        name
+        status
+      }
+    }
+  "
+
+  let assert Ok(operation) = graphql_ast.parse(query_source)
+
+  // Create mock schema with enum type
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharacterStatus",
+          schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
+        ),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "character",
+                schema.NamedType("Character", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation(
+      "get_character",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with enum field in response")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate mutation with enum variable
+pub fn generate_mutation_with_enum_variable_test() {
+  let mutation_source =
+    "
+    mutation FilterCharacters($status: CharacterStatus!) {
+      filterCharacters(status: $status) {
+        id
+        name
+        status
+      }
+    }
+  "
+
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
+
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharacterStatus",
+          schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "filterCharacters",
+                schema.ListType(schema.NamedType("Character", schema.Object)),
+                [
+                  schema.InputValue(
+                    "status",
+                    schema.NonNullType(schema.NamedType(
+                      "CharacterStatus",
+                      schema.Enum,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation(
+      "filter_characters",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with enum variable")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate mutation with enum in InputObject
+pub fn generate_mutation_with_enum_in_input_object_test() {
+  let mutation_source =
+    "
+    mutation CreateCharacter($input: CharacterInput!) {
+      createCharacter(input: $input) {
+        id
+        name
+        status
+      }
+    }
+  "
+
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
+
+  // Define InputObject with enum field
+  let character_input_fields = [
+    schema.InputValue(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      None,
+    ),
+    schema.InputValue(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      None,
+    ),
+    schema.InputValue(
+      "species",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+  ]
+
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharacterStatus",
+          schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
+        ),
+        #(
+          "CharacterInput",
+          schema.InputObjectType("CharacterInput", character_input_fields, None),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "createCharacter",
+                schema.NamedType("Character", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "CharacterInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation(
+      "create_character",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with enum in InputObject")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate query with optional enum field
+pub fn generate_query_with_optional_enum_field_test() {
+  let query_source =
+    "
+    query GetCharacter {
+      character {
+        id
+        name
+        status
+        gender
+      }
+    }
+  "
+
+  let assert Ok(operation) = graphql_ast.parse(query_source)
+
+  // Create mock schema with optional enum field
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      [],
+      None,
+    ),
+    schema.Field("gender", schema.NamedType("Gender", schema.Enum), [], None),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      None,
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharacterStatus",
+          schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
+        ),
+        #("Gender", schema.EnumType("Gender", ["Male", "Female", "Genderless"], None)),
+        #(
+          "Query",
+          schema.ObjectType(
+            "Query",
+            [
+              schema.Field(
+                "character",
+                schema.NamedType("Character", schema.Object),
+                [],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation(
+      "get_character",
+      query_source,
+      operation,
+      mock_schema,
+      "",
+    )
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Query with optional enum field")
+    }
+    Error(_) -> Nil
+  }
+}
+
+// Test: Generate mutation with optional enum in InputObject
+pub fn generate_mutation_with_optional_enum_in_input_test() {
+  let mutation_source =
+    "
+    mutation UpdateCharacter($input: CharacterUpdateInput!) {
+      updateCharacter(input: $input) {
+        id
+        name
+        status
+      }
+    }
+  "
+
+  let assert Ok(operation) = graphql_ast.parse(mutation_source)
+
+  // Define InputObject with optional enum field
+  let character_update_input_fields = [
+    schema.InputValue(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      None,
+    ),
+    schema.InputValue(
+      "name",
+      schema.NamedType("String", schema.Scalar),
+      None,
+    ),
+    schema.InputValue(
+      "status",
+      schema.NamedType("CharacterStatus", schema.Enum),
+      None,
+    ),
+  ]
+
+  let character_fields = [
+    schema.Field(
+      "id",
+      schema.NonNullType(schema.NamedType("ID", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "name",
+      schema.NonNullType(schema.NamedType("String", schema.Scalar)),
+      [],
+      None,
+    ),
+    schema.Field(
+      "status",
+      schema.NonNullType(schema.NamedType("CharacterStatus", schema.Enum)),
+      [],
+      None,
+    ),
+  ]
+
+  let mock_schema =
+    schema.Schema(
+      Some("Query"),
+      Some("Mutation"),
+      None,
+      dict.from_list([
+        #("Character", schema.ObjectType("Character", character_fields, None)),
+        #(
+          "CharacterStatus",
+          schema.EnumType("CharacterStatus", ["Alive", "Dead", "unknown"], None),
+        ),
+        #(
+          "CharacterUpdateInput",
+          schema.InputObjectType(
+            "CharacterUpdateInput",
+            character_update_input_fields,
+            None,
+          ),
+        ),
+        #(
+          "Mutation",
+          schema.ObjectType(
+            "Mutation",
+            [
+              schema.Field(
+                "updateCharacter",
+                schema.NamedType("Character", schema.Object),
+                [
+                  schema.InputValue(
+                    "input",
+                    schema.NonNullType(schema.NamedType(
+                      "CharacterUpdateInput",
+                      schema.InputObject,
+                    )),
+                    None,
+                  ),
+                ],
+                None,
+              ),
+            ],
+            None,
+          ),
+        ),
+      ]),
+    )
+
+  let result =
+    codegen.generate_operation(
+      "update_character",
+      mutation_source,
+      operation,
+      mock_schema,
+      "",
+    )
+
+  case result {
+    Ok(code) -> {
+      code
+      |> birdie.snap(title: "Mutation with optional enum in InputObject")
+    }
+    Error(_) -> Nil
+  }
+}

@@ -36,6 +36,11 @@ type InputTypeInfo {
   )
 }
 
+// Type to track enum types that need to be generated
+type EnumTypeInfo {
+  EnumTypeInfo(type_name: String, enum_values: List(String))
+}
+
 // --- CONSTANTS ---------------------------------------------------------------
 
 const indent = 2
@@ -104,7 +109,12 @@ fn string_doc(content: String) -> Document {
 
 /// Sanitize field names by converting to snake_case and appending underscore to reserved keywords
 fn sanitize_field_name(name: String) -> String {
-  let snake_cased = snake_case(name)
+  // Handle GraphQL introspection fields by removing __ prefix
+  let cleaned = case string.starts_with(name, "__") {
+    True -> string.drop_start(name, 2)
+    False -> name
+  }
+  let snake_cased = snake_case(cleaned)
   case list.contains(reserved_keywords, snake_cased) {
     True -> snake_cased <> "_"
     False -> snake_cased
@@ -267,6 +277,10 @@ pub fn generate_operation_with_fragments(
   schema_data: schema.Schema,
   _graphql_endpoint: String,
 ) -> Result(String, Error) {
+  // Note: typename injection is disabled for the generate command
+  // It's only enabled for unstable-cache command which needs it for cache normalization
+  let modified_source = source
+
   // Extract selections and expand any fragments
   let selections = graphql_ast.get_selections(operation)
 
@@ -375,13 +389,31 @@ pub fn generate_operation_with_fragments(
     })
     |> list.flatten
 
-  // Use the original source string directly (includes fragment definitions)
+  // Collect Enum types from variables and response fields
+  use enum_types <- result.try(collect_enum_types(
+    variables,
+    field_types,
+    schema_data.types,
+  ))
+
+  // Generate Enum type definitions, to_string functions, and decoders
+  let enum_docs =
+    enum_types
+    |> list.map(fn(enum_info) {
+      let type_doc = generate_enum_type_definition(enum_info)
+      let to_string_doc = generate_enum_to_string(enum_info)
+      let decoder_doc = generate_enum_decoder(enum_info)
+      [type_doc, to_string_doc, decoder_doc]
+    })
+    |> list.flatten
+
+  // Use the modified source string with __typename injected
   let function_def =
     generate_function(
       operation_name,
       response_type_name,
       variables,
-      source,
+      modified_source,
       schema_data.types,
     )
 
@@ -421,9 +453,10 @@ pub fn generate_operation_with_fragments(
     )
 
   // Combine all code using doc combinators
-  // Order: imports, input types, nested types, nested serializers, response type, response decoder, response serializer, function
+  // Order: imports, enum types, input types, nested types, nested serializers, response type, response decoder, response serializer, function
   let all_docs =
-    [imports, ..input_docs]
+    [imports, ..enum_docs]
+    |> list.append(input_docs)
     |> list.append(nested_docs)
     |> list.append(nested_serializer_docs)
     |> list.append([type_def, decoder, response_serializer, function_def])
@@ -451,17 +484,26 @@ fn collect_field_types(
   |> list.try_map(fn(selection) {
     case selection {
       parser.Field(field_name, _alias, _args, _nested) -> {
-        // Find field in parent type
-        let fields = schema.get_type_fields(parent_type)
-        let field_result =
-          fields
-          |> list.find(fn(f) { f.name == field_name })
+        // Handle special introspection fields
+        case field_name {
+          "__typename" -> {
+            // __typename is a special meta-field that returns String!
+            Ok(#(field_name, schema.NamedType("String", schema.Scalar)))
+          }
+          _ -> {
+            // Find field in parent type
+            let fields = schema.get_type_fields(parent_type)
+            let field_result =
+              fields
+              |> list.find(fn(f) { f.name == field_name })
 
-        field_result
-        |> result.map(fn(field) { #(field_name, field.type_ref) })
-        |> result.map_error(fn(_) {
-          error.InvalidSchemaResponse("Field not found: " <> field_name)
-        })
+            field_result
+            |> result.map(fn(field) { #(field_name, field.type_ref) })
+            |> result.map_error(fn(_) {
+              error.InvalidSchemaResponse("Field not found: " <> field_name)
+            })
+          }
+        }
       }
       _ ->
         Error(error.InvalidGraphQLSyntax(
@@ -483,52 +525,61 @@ fn collect_nested_types(
   |> list.try_map(fn(selection) {
     case selection {
       parser.Field(field_name, _alias, _args, nested_selections) -> {
-        // Find field in parent type
-        let fields = schema.get_type_fields(parent_type)
-        use field <- result.try(
-          fields
-          |> list.find(fn(f) { f.name == field_name })
-          |> result.map_error(fn(_) {
-            error.InvalidSchemaResponse("Field not found: " <> field_name)
-          }),
-        )
-
-        // Check if this field has nested selections
-        case nested_selections {
-          [] -> Ok([])
+        // Handle special introspection fields
+        case field_name {
+          "__typename" -> {
+            // __typename is a special meta-field that has no nested selections
+            Ok([])
+          }
           _ -> {
-            // Get the type name from the field's type reference
-            let type_name = get_base_type_name(field.type_ref)
-
-            // Look up the type in schema
-            use field_type <- result.try(
-              dict.get(schema_data.types, type_name)
+            // Find field in parent type
+            let fields = schema.get_type_fields(parent_type)
+            use field <- result.try(
+              fields
+              |> list.find(fn(f) { f.name == field_name })
               |> result.map_error(fn(_) {
-                error.InvalidSchemaResponse("Type not found: " <> type_name)
+                error.InvalidSchemaResponse("Field not found: " <> field_name)
               }),
             )
 
-            // Collect field types for this nested object
-            use nested_field_types <- result.try(collect_field_types(
-              nested_selections,
-              field_type,
-            ))
+            // Check if this field has nested selections
+            case nested_selections {
+              [] -> Ok([])
+              _ -> {
+                // Get the type name from the field's type reference
+                let type_name = get_base_type_name(field.type_ref)
 
-            // Recursively collect any deeper nested types
-            use deeper_nested <- result.try(collect_nested_types(
-              nested_selections,
-              field_type,
-              schema_data,
-            ))
+                // Look up the type in schema
+                use field_type <- result.try(
+                  dict.get(schema_data.types, type_name)
+                  |> result.map_error(fn(_) {
+                    error.InvalidSchemaResponse("Type not found: " <> type_name)
+                  }),
+                )
 
-            let nested_info =
-              NestedTypeInfo(
-                type_name: type_name,
-                fields: nested_field_types,
-                field_types: schema_data.types,
-              )
+                // Collect field types for this nested object
+                use nested_field_types <- result.try(collect_field_types(
+                  nested_selections,
+                  field_type,
+                ))
 
-            Ok([nested_info, ..deeper_nested])
+                // Recursively collect any deeper nested types
+                use deeper_nested <- result.try(collect_nested_types(
+                  nested_selections,
+                  field_type,
+                  schema_data,
+                ))
+
+                let nested_info =
+                  NestedTypeInfo(
+                    type_name: type_name,
+                    fields: nested_field_types,
+                    field_types: schema_data.types,
+                  )
+
+                Ok([nested_info, ..deeper_nested])
+              }
+            }
           }
         }
       }
@@ -650,6 +701,96 @@ fn collect_input_types_from_type_ref(
   }
 }
 
+// Collect all Enum types used in variables and response fields
+fn collect_enum_types(
+  variables: List(graphql_ast.Variable),
+  field_types: List(#(String, schema.TypeRef)),
+  schema_types: dict.Dict(String, schema.Type),
+) -> Result(List(EnumTypeInfo), Error) {
+  // Collect from variables
+  let var_enums =
+    variables
+    |> list.try_map(fn(var) {
+      let type_str = graphql_ast.get_variable_type_string(var)
+      use schema_type_ref <- result.try(
+        type_mapping.parse_type_string_with_schema(type_str, schema_types),
+      )
+      collect_enum_types_from_type_ref(schema_type_ref, schema_types, [])
+    })
+    |> result.map(list.flatten)
+
+  // Collect from response fields
+  let field_enums =
+    field_types
+    |> list.map(fn(field) {
+      let #(_name, type_ref) = field
+      collect_enum_types_from_type_ref(type_ref, schema_types, [])
+    })
+    |> result.all
+    |> result.map(list.flatten)
+
+  use var_enum_list <- result.try(var_enums)
+  use field_enum_list <- result.try(field_enums)
+
+  // Combine and deduplicate
+  Ok(
+    list.append(var_enum_list, field_enum_list)
+    |> list.fold(dict.new(), fn(acc, info) {
+      dict.insert(acc, info.type_name, info)
+    })
+    |> dict.values,
+  )
+}
+
+// Recursively collect Enum types from a type reference
+fn collect_enum_types_from_type_ref(
+  type_ref: schema.TypeRef,
+  schema_types: dict.Dict(String, schema.Type),
+  collected: List(EnumTypeInfo),
+) -> Result(List(EnumTypeInfo), Error) {
+  case type_ref {
+    schema.NamedType(name, kind) -> {
+      case kind {
+        schema.Enum -> {
+          // Check if we've already collected this enum
+          let already_collected =
+            list.any(collected, fn(info) { info.type_name == name })
+
+          case already_collected {
+            True -> Ok(collected)
+            False -> {
+              // Look up the Enum type in schema
+              use enum_type <- result.try(
+                dict.get(schema_types, name)
+                |> result.map_error(fn(_) {
+                  error.InvalidSchemaResponse("Enum type not found: " <> name)
+                }),
+              )
+
+              case enum_type {
+                schema.EnumType(_, enum_values, _) -> {
+                  let info =
+                    EnumTypeInfo(type_name: name, enum_values: enum_values)
+                  Ok([info, ..collected])
+                }
+                _ ->
+                  Error(error.InvalidSchemaResponse(
+                    "Expected Enum type: " <> name,
+                  ))
+              }
+            }
+          }
+        }
+        _ -> Ok(collected)
+      }
+    }
+    schema.NonNullType(inner) ->
+      collect_enum_types_from_type_ref(inner, schema_types, collected)
+    schema.ListType(inner) ->
+      collect_enum_types_from_type_ref(inner, schema_types, collected)
+  }
+}
+
 // Generate type definition
 fn generate_type_definition(
   type_name: String,
@@ -768,9 +909,10 @@ fn generate_field_decoder_with_schema(
       "decode.optional(" <> inner_decoder <> ")"
     }
     type_mapping.CustomType(name) -> {
-      // Check if this is an object type that has a decoder
+      // Check if this is an object or enum type that has a decoder
       case dict.get(schema_types, name) {
         Ok(schema.ObjectType(_, _, _)) -> snake_case(name) <> "_decoder()"
+        Ok(schema.EnumType(_, _, _)) -> snake_case(name) <> "_decoder()"
         _ -> "decode.dynamic"
       }
     }
@@ -799,6 +941,8 @@ fn generate_field_decoder_with_schema_inner(
     type_mapping.CustomType(_) ->
       case dict.get(schema_types, base_type_name) {
         Ok(schema.ObjectType(_, _, _)) ->
+          snake_case(base_type_name) <> "_decoder()"
+        Ok(schema.EnumType(_, _, _)) ->
           snake_case(base_type_name) <> "_decoder()"
         _ -> "decode.dynamic"
       }
@@ -1043,10 +1187,141 @@ fn encode_input_field_value(
       }
     }
     type_mapping.CustomType(name) -> {
-      // This is an InputObject
-      call_doc(snake_case(name) <> "_to_json", [doc.from_string(field_access)])
+      // Check if this is an Enum or InputObject
+      case dict.get(schema_types, name) {
+        Ok(schema.EnumType(_, _, _)) ->
+          // Enum: convert to string first, then wrap in json.string
+          call_doc("json.string", [
+            doc.from_string(
+              snake_case(name) <> "_to_string(" <> field_access <> ")",
+            ),
+          ])
+        _ ->
+          // InputObject
+          call_doc(snake_case(name) <> "_to_json", [
+            doc.from_string(field_access),
+          ])
+      }
     }
   }
+}
+
+// Generate Enum type definition
+fn generate_enum_type_definition(enum_info: EnumTypeInfo) -> Document {
+  let variant_docs =
+    enum_info.enum_values
+    |> list.map(fn(value) { doc.from_string(to_pascal_case(value)) })
+
+  [
+    doc.from_string("pub type " <> enum_info.type_name <> " {"),
+    [
+      doc.line,
+      doc.join(variant_docs, doc.line),
+    ]
+      |> doc.concat
+      |> doc.nest(by: indent),
+    doc.line,
+    doc.from_string("}"),
+  ]
+  |> doc.concat
+  |> doc.group
+}
+
+// Generate Enum to String conversion function
+fn generate_enum_to_string(enum_info: EnumTypeInfo) -> Document {
+  let function_name = snake_case(enum_info.type_name) <> "_to_string"
+
+  let match_arms =
+    enum_info.enum_values
+    |> list.map(fn(value) {
+      doc.concat([
+        doc.from_string(to_pascal_case(value) <> " -> "),
+        string_doc(value),
+      ])
+    })
+
+  let case_expr =
+    [
+      doc.from_string("case value {"),
+      [doc.line, doc.join(match_arms, doc.line)]
+        |> doc.concat
+        |> doc.nest(by: indent),
+      doc.line,
+      doc.from_string("}"),
+    ]
+    |> doc.concat
+
+  doc.concat([
+    doc.from_string(
+      "pub fn "
+      <> function_name
+      <> "(value: "
+      <> enum_info.type_name
+      <> ") -> String ",
+    ),
+    block([case_expr]),
+  ])
+}
+
+// Generate Enum decoder function
+fn generate_enum_decoder(enum_info: EnumTypeInfo) -> Document {
+  let decoder_name = snake_case(enum_info.type_name) <> "_decoder"
+
+  let match_arms =
+    enum_info.enum_values
+    |> list.map(fn(value) {
+      doc.concat([
+        string_doc(value),
+        doc.from_string(" -> decode.success(" <> to_pascal_case(value) <> ")"),
+      ])
+    })
+
+  // Use the first enum variant as the zero value for failure
+  let first_variant = case enum_info.enum_values {
+    [first, ..] -> to_pascal_case(first)
+    [] -> "UnknownVariant"
+  }
+
+  let all_match_arms =
+    list.append(match_arms, [
+      doc.concat([
+        doc.from_string("_other -> decode.failure("),
+        doc.from_string(first_variant),
+        doc.from_string(", "),
+        string_doc(enum_info.type_name),
+        doc.from_string(")"),
+      ]),
+    ])
+
+  let decoder_body = [
+    doc.from_string("decode.string"),
+    doc.line,
+    doc.from_string("|> decode.then(fn(str) {"),
+    [
+      doc.line,
+      doc.from_string("case str {"),
+      [doc.line, doc.join(all_match_arms, doc.line)]
+        |> doc.concat
+        |> doc.nest(by: indent),
+      doc.line,
+      doc.from_string("}"),
+    ]
+      |> doc.concat
+      |> doc.nest(by: indent),
+    doc.line,
+    doc.from_string("})"),
+  ]
+
+  doc.concat([
+    doc.from_string(
+      "pub fn "
+      <> decoder_name
+      <> "() -> decode.Decoder("
+      <> enum_info.type_name
+      <> ") ",
+    ),
+    block(decoder_body),
+  ])
 }
 
 // Generate Response serializer function (for output types)
@@ -1131,6 +1406,13 @@ fn encode_response_field_value(
             doc.from_string("of: " <> snake_case(base_type_name) <> "_to_json"),
           ])
         }
+        Ok(schema.EnumType(_, _, _)) -> {
+          // List of Enums
+          call_doc("json.array", [
+            doc.from_string("from: " <> field_access),
+            doc.from_string("of: fn(v) { json.string(" <> snake_case(base_type_name) <> "_to_string(v)) }"),
+          ])
+        }
         _ -> {
           // List of scalars
           let of_fn = case inner {
@@ -1165,6 +1447,8 @@ fn encode_response_field_value(
                   case dict.get(schema_types, name) {
                     Ok(schema.ObjectType(_, _, _)) ->
                       snake_case(name) <> "_to_json"
+                    Ok(schema.EnumType(_, _, _)) ->
+                      "fn(v) { json.string(" <> snake_case(name) <> "_to_string(v)) }"
                     _ -> "json.string"
                   }
                 _ -> "json.string"
@@ -1179,7 +1463,7 @@ fn encode_response_field_value(
           ])
         }
         _ -> {
-          // Not a list, check if it's an object or scalar
+          // Not a list, check if it's an object, enum, or scalar
           let base_type_name = get_base_type_name(type_ref)
           case dict.get(schema_types, base_type_name) {
             Ok(schema.ObjectType(_, _, _)) -> {
@@ -1187,6 +1471,13 @@ fn encode_response_field_value(
               call_doc("json.nullable", [
                 doc.from_string(field_access),
                 doc.from_string(snake_case(base_type_name) <> "_to_json"),
+              ])
+            }
+            Ok(schema.EnumType(_, _, _)) -> {
+              // Optional Enum
+              call_doc("json.nullable", [
+                doc.from_string(field_access),
+                doc.from_string("fn(v) { json.string(" <> snake_case(base_type_name) <> "_to_string(v)) }"),
               ])
             }
             _ -> {
@@ -1209,14 +1500,21 @@ fn encode_response_field_value(
       }
     }
     type_mapping.CustomType(name) -> {
-      // This is an Object type
+      // Check if this is an Object, Enum, or other custom type
       case dict.get(schema_types, name) {
         Ok(schema.ObjectType(_, _, _)) ->
           call_doc(snake_case(name) <> "_to_json", [
             doc.from_string(field_access),
           ])
+        Ok(schema.EnumType(_, _, _)) ->
+          // Enum: convert to string first, then wrap in json.string
+          call_doc("json.string", [
+            doc.from_string(
+              snake_case(name) <> "_to_string(" <> field_access <> ")",
+            ),
+          ])
         _ ->
-          // Fallback to string if not an object type
+          // Fallback to string if not an object or enum type
           call_doc("json.string", [doc.from_string(field_access)])
       }
     }
@@ -1432,8 +1730,15 @@ fn encode_variable_value(
       }
     }
     type_mapping.CustomType(name) -> {
-      // Check if this is an InputObject
+      // Check if this is an Enum or InputObject
       case dict.get(schema_types, name) {
+        Ok(schema.EnumType(_, _, _)) ->
+          // Enum: convert to string first, then wrap in json.string
+          call_doc("json.string", [
+            doc.from_string(
+              snake_case(name) <> "_to_string(" <> var_name <> ")",
+            ),
+          ])
         Ok(schema.InputObjectType(_, _, _)) ->
           call_doc(snake_case(name) <> "_to_json", [doc.from_string(var_name)])
         _ -> call_doc("json.string", [doc.from_string(var_name)])

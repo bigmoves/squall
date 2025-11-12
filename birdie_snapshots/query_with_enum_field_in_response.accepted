@@ -1,0 +1,62 @@
+---
+version: 1.4.1
+title: Query with enum field in response
+file: ./test/codegen_test.gleam
+test_name: generate_query_with_enum_field_test
+---
+import gleam/dynamic/decode
+import gleam/http/request.{type Request}
+import gleam/json
+import squall
+import gleam/option.{type Option}
+
+pub type Character {
+  Character(id: String, name: String, status: CharacterStatus)
+}
+
+pub fn character_decoder() -> decode.Decoder(Character) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  use status <- decode.field("status", character_status_decoder())
+  decode.success(Character(id: id, name: name, status: status))
+}
+
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+      #("status", json.string(character_status_to_string(input.status))),
+    ],
+  )
+}
+
+pub type GetCharacterResponse {
+  GetCharacterResponse(character: Option(Character))
+}
+
+pub fn get_character_response_decoder() -> decode.Decoder(GetCharacterResponse) {
+  use character <- decode.field("character", decode.optional(character_decoder()))
+  decode.success(GetCharacterResponse(character: character))
+}
+
+pub fn get_character_response_to_json(input: GetCharacterResponse) -> json.Json {
+  json.object(
+    [
+      #("character", json.nullable(input.character, character_to_json)),
+    ],
+  )
+}
+
+pub fn get_character(client: squall.Client) -> Result(Request(String), String) {
+  squall.prepare_request(
+    client,
+    "\n    query GetCharacter {\n      character {\n        id\n        name\n        status\n      }\n    }\n  ",
+    json.object([]),
+  )
+}
+
+pub fn parse_get_character_response(body: String) -> Result(GetCharacterResponse, String) {
+  squall.parse_response(body, get_character_response_decoder())
+}
+

@@ -1,0 +1,96 @@
+---
+version: 1.4.1
+title: Mutation with enum variable
+file: ./test/codegen_test.gleam
+test_name: generate_mutation_with_enum_variable_test
+---
+import gleam/dynamic/decode
+import gleam/http/request.{type Request}
+import gleam/json
+import squall
+import gleam/option.{type Option}
+
+pub type CharacterStatus {
+  Alive
+  Dead
+  Unknown
+}
+
+pub fn character_status_to_string(value: CharacterStatus) -> String {
+  case value {
+    Alive -> "Alive"
+    Dead -> "Dead"
+    Unknown -> "unknown"
+  }
+}
+
+pub fn character_status_decoder() -> decode.Decoder(CharacterStatus) {
+  decode.string
+  
+  
+  |> decode.then(fn(str) {
+  
+    case str {
+      "Alive" -> decode.success(Alive)
+      "Dead" -> decode.success(Dead)
+      "unknown" -> decode.success(Unknown)
+      _other -> decode.failure(Alive, "CharacterStatus")
+    }
+  
+  
+  })
+}
+
+pub type Character {
+  Character(id: String, name: String, status: CharacterStatus)
+}
+
+pub fn character_decoder() -> decode.Decoder(Character) {
+  use id <- decode.field("id", decode.string)
+  use name <- decode.field("name", decode.string)
+  use status <- decode.field("status", character_status_decoder())
+  decode.success(Character(id: id, name: name, status: status))
+}
+
+pub fn character_to_json(input: Character) -> json.Json {
+  json.object(
+    [
+      #("id", json.string(input.id)),
+      #("name", json.string(input.name)),
+      #("status", json.string(character_status_to_string(input.status))),
+    ],
+  )
+}
+
+pub type FilterCharactersResponse {
+  FilterCharactersResponse(filter_characters: Option(List(Character)))
+}
+
+pub fn filter_characters_response_decoder() -> decode.Decoder(FilterCharactersResponse) {
+  use filter_characters <- decode.field("filterCharacters", decode.optional(decode.list(character_decoder())))
+  decode.success(FilterCharactersResponse(filter_characters: filter_characters))
+}
+
+pub fn filter_characters_response_to_json(input: FilterCharactersResponse) -> json.Json {
+  json.object(
+    [
+      #("filterCharacters", json.nullable(
+        input.filter_characters,
+        fn(list) { json.array(from: list, of: character_to_json) },
+      )),
+    ],
+  )
+}
+
+pub fn filter_characters(client: squall.Client, status: CharacterStatus) -> Result(Request(String), String) {
+  squall.prepare_request(
+    client,
+    "\n    mutation FilterCharacters($status: CharacterStatus!) {\n      filterCharacters(status: $status) {\n        id\n        name\n        status\n      }\n    }\n  ",
+    json.object([#("status", json.string(character_status_to_string(status)))]),
+  )
+}
+
+pub fn parse_filter_characters_response(body: String) -> Result(FilterCharactersResponse, String) {
+  squall.parse_response(body, filter_characters_response_decoder())
+}
+

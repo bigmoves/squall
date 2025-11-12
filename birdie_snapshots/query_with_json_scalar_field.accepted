@@ -1,6 +1,8 @@
 ---
 version: 1.4.1
 title: Query with JSON scalar field
+file: ./test/codegen_test.gleam
+test_name: generate_query_with_json_scalar_test
 ---
 import gleam/dynamic/decode
 import gleam/http/request.{type Request}
